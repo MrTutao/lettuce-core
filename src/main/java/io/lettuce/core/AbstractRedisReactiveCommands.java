@@ -25,6 +25,8 @@ import java.util.function.Supplier;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import io.lettuce.core.GeoArgs.Unit;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.reactive.*;
@@ -57,6 +59,7 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     private final RedisCommandBuilder<K, V> commandBuilder;
     private final ClientResources clientResources;
     private final boolean tracingEnabled;
+    private Scheduler scheduler;
 
     /**
      * Initialize a new instance.
@@ -70,6 +73,21 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
         this.commandBuilder = new RedisCommandBuilder<>(codec);
         this.clientResources = connection.getResources();
         this.tracingEnabled = clientResources.tracing().isEnabled();
+    }
+
+    private Scheduler getScheduler() {
+
+        if (this.scheduler != null) {
+            return this.scheduler;
+        }
+
+        Scheduler scheduler = Schedulers.immediate();
+
+        if (connection.getOptions().isPublishOnScheduler()) {
+            scheduler = Schedulers.fromExecutorService(connection.getResources().eventExecutorGroup());
+        }
+
+        return this.scheduler = scheduler;
     }
 
     @Override
@@ -380,10 +398,10 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
         if (tracingEnabled) {
 
             return withTraceContext().flatMapMany(
-                    it -> Flux.from(new RedisPublisher<>(decorate(commandSupplier, it), connection, dissolve)));
+                    it -> Flux.from(new RedisPublisher<>(decorate(commandSupplier, it), connection, dissolve, getScheduler())));
         }
 
-        return Flux.from(new RedisPublisher<>(commandSupplier, connection, dissolve));
+        return Flux.from(new RedisPublisher<>(commandSupplier, connection, dissolve, getScheduler()));
     }
 
     private Mono<TraceContext> withTraceContext() {
@@ -402,10 +420,10 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
         if (tracingEnabled) {
 
             return withTraceContext().flatMap(
-                    it -> Mono.from(new RedisPublisher<>(decorate(commandSupplier, it), connection, false)));
+                    it -> Mono.from(new RedisPublisher<>(decorate(commandSupplier, it), connection, false, getScheduler())));
         }
 
-        return Mono.from(new RedisPublisher<>(commandSupplier, connection, false));
+        return Mono.from(new RedisPublisher<>(commandSupplier, connection, false, getScheduler()));
     }
 
     private <T> Supplier<RedisCommand<K, V, T>> decorate(Supplier<RedisCommand<K, V, T>> commandSupplier,

@@ -86,7 +86,8 @@ class ReactiveBackpressurePropagationUnitTests {
 
         Command<String, String, List<String>> lrange = new Command<>(CommandType.LRANGE,
                 new ValueListOutput<>(StringCodec.UTF8));
-        RedisPublisher<String, String, String> publisher = new RedisPublisher<>((Command) lrange, statefulConnection, true);
+        RedisPublisher<String, String, String> publisher = new RedisPublisher<>((Command) lrange, statefulConnection, true,
+                Schedulers.immediate());
 
         CountDownLatch pressureArrived = new CountDownLatch(1);
         CountDownLatch buildPressure = new CountDownLatch(1);
@@ -138,7 +139,8 @@ class ReactiveBackpressurePropagationUnitTests {
 
         Command<String, String, List<String>> lrange = new Command<>(CommandType.LRANGE,
                 new ValueListOutput<>(StringCodec.UTF8));
-        RedisPublisher<String, String, String> publisher = new RedisPublisher<>((Command) lrange, statefulConnection, true);
+        RedisPublisher<String, String, String> publisher = new RedisPublisher<>((Command) lrange, statefulConnection, true,
+                Schedulers.immediate());
 
         CountDownLatch pressureArrived = new CountDownLatch(1);
         CountDownLatch buildPressure = new CountDownLatch(1);

@@ -17,6 +17,7 @@ package io.lettuce.core;
 
 import java.util.function.Supplier;
 
+import reactor.core.scheduler.Schedulers;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.protocol.RedisCommand;
 
@@ -26,11 +27,11 @@ import io.lettuce.core.protocol.RedisCommand;
 public class TestRedisPublisher<K, V, T> extends RedisPublisher<K, V, T> {
 
     public TestRedisPublisher(RedisCommand<K, V, T> staticCommand, StatefulConnection<K, V> connection, boolean dissolve) {
-        super(staticCommand, connection, dissolve);
+        super(staticCommand, connection, dissolve, Schedulers.immediate());
     }
 
     public TestRedisPublisher(Supplier<RedisCommand<K, V, T>> redisCommandSupplier, StatefulConnection<K, V> connection,
             boolean dissolve) {
-        super(redisCommandSupplier, connection, dissolve);
+        super(redisCommandSupplier, connection, dissolve, Schedulers.immediate());
     }
 }
