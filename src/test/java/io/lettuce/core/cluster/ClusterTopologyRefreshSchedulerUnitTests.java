@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.lettuce.core.cluster;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -27,11 +28,15 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import io.lettuce.core.cluster.models.partitions.Partitions;
+import io.lettuce.core.event.EventBus;
+import io.lettuce.core.event.cluster.AdaptiveRefreshTriggeredEvent;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.test.Delay;
 import io.netty.util.concurrent.EventExecutorGroup;
@@ -45,11 +50,11 @@ class ClusterTopologyRefreshSchedulerUnitTests {
 
     private ClusterTopologyRefreshScheduler sut;
 
-    private ClusterTopologyRefreshOptions immediateRefresh = ClusterTopologyRefreshOptions.builder().enablePeriodicRefresh(1, TimeUnit.MILLISECONDS)
-            .enableAllAdaptiveRefreshTriggers().build();
+    private ClusterTopologyRefreshOptions immediateRefresh = ClusterTopologyRefreshOptions.builder()
+            .enablePeriodicRefresh(1, TimeUnit.MILLISECONDS).enableAllAdaptiveRefreshTriggers().build();
 
-    private ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder()
-            .topologyRefreshOptions(immediateRefresh).build();
+    private ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder().topologyRefreshOptions(immediateRefresh)
+            .build();
 
     @Mock
     private ClientResources clientResources;
@@ -60,9 +65,13 @@ class ClusterTopologyRefreshSchedulerUnitTests {
     @Mock
     private EventExecutorGroup eventExecutors;
 
+    @Mock
+    private EventBus eventBus;
+
     @BeforeEach
     void before() {
 
+        when(clientResources.eventBus()).thenReturn(eventBus);
         when(clientResources.eventExecutorGroup()).thenReturn(eventExecutors);
 
         sut = new ClusterTopologyRefreshScheduler(clusterClient, clientResources);
@@ -180,6 +189,18 @@ class ClusterTopologyRefreshSchedulerUnitTests {
     }
 
     @Test
+    void shouldTriggerRefreshOnUncoveredSlot() {
+
+        ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder().topologyRefreshOptions(immediateRefresh)
+                .build();
+
+        when(clusterClient.getClusterClientOptions()).thenReturn(clusterClientOptions);
+
+        sut.onUncoveredSlot(1234);
+        verify(eventExecutors).submit(any(Runnable.class));
+    }
+
+    @Test
     void shouldTriggerRefreshOnUnknownNode() {
 
         ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder().topologyRefreshOptions(immediateRefresh)
@@ -222,5 +243,56 @@ class ClusterTopologyRefreshSchedulerUnitTests {
         sut.onAskRedirection();
 
         verify(eventExecutors, times(2)).submit(any(Runnable.class));
+    }
+
+    @Test
+    void shouldEmitAdaptiveRefreshEventOnSchedule() {
+
+        ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder().topologyRefreshOptions(immediateRefresh)
+                .build();
+
+        when(clusterClient.getClusterClientOptions()).thenReturn(clusterClientOptions);
+
+        sut.onMovedRedirection();
+        verify(eventExecutors).submit(any(Runnable.class));
+        verify(eventBus).publish(any(AdaptiveRefreshTriggeredEvent.class));
+    }
+
+    @Test
+    void shouldScheduleRefreshViaAdaptiveRefreshTriggeredEvent() {
+
+        ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder().topologyRefreshOptions(immediateRefresh)
+                .build();
+        when(clusterClient.getClusterClientOptions()).thenReturn(clusterClientOptions);
+
+        sut.onMovedRedirection();
+
+        ArgumentCaptor<AdaptiveRefreshTriggeredEvent> captor = ArgumentCaptor.forClass(AdaptiveRefreshTriggeredEvent.class);
+        verify(eventBus).publish(captor.capture());
+
+        AdaptiveRefreshTriggeredEvent capture = captor.getValue();
+
+        capture.scheduleRefresh();
+        verify(eventExecutors, times(2)).submit(any(Runnable.class));
+    }
+
+    @Test
+    void shouldRetrievePartitionsViaAdaptiveRefreshTriggeredEvent() {
+
+        ClusterClientOptions clusterClientOptions = ClusterClientOptions.builder().topologyRefreshOptions(immediateRefresh)
+                .build();
+        when(clusterClient.getClusterClientOptions()).thenReturn(clusterClientOptions);
+
+        sut.onMovedRedirection();
+
+        ArgumentCaptor<AdaptiveRefreshTriggeredEvent> captor = ArgumentCaptor.forClass(AdaptiveRefreshTriggeredEvent.class);
+        verify(eventBus).publish(captor.capture());
+
+        AdaptiveRefreshTriggeredEvent capture = captor.getValue();
+
+        Partitions partitions = new Partitions();
+        when(clusterClient.getPartitions()).thenReturn(partitions);
+
+        assertThat(capture.getPartitions()).isSameAs(partitions);
     }
 }

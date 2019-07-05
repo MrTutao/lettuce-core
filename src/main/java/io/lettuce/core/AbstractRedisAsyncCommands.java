@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -892,6 +892,11 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
+    public RedisFuture<Long> memoryUsage(K key) {
+        return dispatch(commandBuilder.memoryUsage(key));
+    }
+
+    @Override
     public RedisFuture<List<KeyValue<K, V>>> mget(K... keys) {
         return dispatch(commandBuilder.mgetKeyValue(keys));
     }
@@ -1542,6 +1547,21 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     @Override
     public RedisFuture<String> xgroupSetid(XReadArgs.StreamOffset<K> offset, K group) {
         return dispatch(commandBuilder.xgroupSetid(offset, group));
+    }
+
+    @Override
+    public RedisFuture<List<Object>> xinfoStream(K key) {
+        return dispatch(commandBuilder.xinfoStream(key));
+    }
+
+    @Override
+    public RedisFuture<List<Object>> xinfoGroups(K key) {
+        return dispatch(commandBuilder.xinfoGroups(key));
+    }
+
+    @Override
+    public RedisFuture<List<Object>> xinfoConsumers(K key, K group) {
+        return dispatch(commandBuilder.xinfoConsumers(key, group));
     }
 
     @Override

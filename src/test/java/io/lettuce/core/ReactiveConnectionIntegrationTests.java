@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.lettuce.core;
 
 import static io.lettuce.core.ClientOptions.DisconnectedBehavior.REJECT_COMMANDS;
+import static io.lettuce.core.ScriptOutputType.INTEGER;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -44,6 +45,10 @@ import io.lettuce.test.Delay;
 import io.lettuce.test.LettuceExtension;
 import io.lettuce.test.Wait;
 
+/**
+ * @author Mark Paluch
+ * @author Nikolai Perevozchikov
+ */
 @ExtendWith(LettuceExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReactiveConnectionIntegrationTests extends TestSupport {
@@ -233,6 +238,26 @@ class ReactiveConnectionIntegrationTests extends TestSupport {
                         }).verify();
 
         connection.close();
+    }
+
+    @Test
+    @Inject
+    void publishOnSchedulerTest(RedisClient client) {
+
+        client.setOptions(ClientOptions.builder().publishOnScheduler(true).build());
+
+        RedisReactiveCommands<String, String> reactive = client.connect().reactive();
+
+        int counter = 0;
+        for (int i = 0; i < 1000; i++) {
+            if (reactive.eval("return 1", INTEGER).next().block() == null) {
+                counter++;
+            }
+        }
+
+        assertThat(counter).isZero();
+
+        reactive.getStatefulConnection().close();
     }
 
     private static Subscriber<String> createSubscriberWithExceptionOnComplete() {

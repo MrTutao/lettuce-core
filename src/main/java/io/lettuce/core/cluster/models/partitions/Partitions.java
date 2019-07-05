@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import io.lettuce.core.internal.LettuceAssert;
  * {@link io.lettuce.core.cluster.models.partitions.RedisClusterNode.NodeFlag#SLAVE} state</li>
  * <li>Newly added or removed nodes to/from the Redis Cluster</li>
  * <li>Changes in {@link RedisClusterNode#getSlots()} responsibility</li>
- * <li>Changes to the {@link RedisClusterNode#getSlaveOf() slave replication source} (the master of a slave)</li>
+ * <li>Changes to the {@link RedisClusterNode#getSlaveOf() replication source} (the master of a replica)</li>
  * <li>Changes to the {@link RedisClusterNode#getUri()} () connection point}</li>
  * </ul>
  *
@@ -158,9 +158,7 @@ public class Partitions implements Collection<RedisClusterNode> {
             for (RedisClusterNode partition : partitions) {
 
                 readView.add(partition);
-                for (Integer integer : partition.getSlots()) {
-                    slotCache[integer.intValue()] = partition;
-                }
+                partition.forEachSlot(i -> slotCache[i] = partition);
             }
 
             this.slotCache = slotCache;

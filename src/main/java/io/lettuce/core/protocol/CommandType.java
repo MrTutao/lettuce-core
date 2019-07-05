@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package io.lettuce.core.protocol;
  *
  * @author Will Glozer
  * @author Mark Paluch
+ * @author Zhang Jessey
  */
 public enum CommandType implements ProtocolKeyword {
     // Connection
@@ -28,7 +29,7 @@ public enum CommandType implements ProtocolKeyword {
 
     // Server
 
-    BGREWRITEAOF, BGSAVE, CLIENT, COMMAND, CONFIG, DBSIZE, DEBUG, FLUSHALL, FLUSHDB, INFO, MYID, LASTSAVE, ROLE, MONITOR, SAVE, SHUTDOWN, SLAVEOF, SLOWLOG, SYNC,
+    BGREWRITEAOF, BGSAVE, CLIENT, COMMAND, CONFIG, DBSIZE, DEBUG, FLUSHALL, FLUSHDB, INFO, MYID, LASTSAVE, ROLE, MONITOR, SAVE, SHUTDOWN, SLAVEOF, SLOWLOG, SYNC, MEMORY,
 
     // Keys
 

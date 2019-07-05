@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
     private StatefulRedisMasterSlaveConnectionImpl<String, String> connection;
 
     private RedisURI master;
-    private RedisURI slave;
+    private RedisURI replica;
 
     private RedisAsyncCommands<String, String> connectionToNode1;
     private RedisAsyncCommands<String, String> connectionToNode2;
@@ -67,14 +67,14 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
 
         if (node1Instance.getRole() == RedisInstance.Role.MASTER && node2Instance.getRole() == RedisInstance.Role.SLAVE) {
             master = node1;
-            slave = node2;
+            replica = node2;
         } else if (node2Instance.getRole() == RedisInstance.Role.MASTER
                 && node1Instance.getRole() == RedisInstance.Role.SLAVE) {
             master = node2;
-            slave = node1;
+            replica = node1;
         } else {
             assumeTrue(false, String.format(
-                    "Cannot run the test because I don't have a distinct master and slave but %s and %s", node1Instance,
+                    "Cannot run the test because I don't have a distinct master and replica but %s and %s", node1Instance,
                     node2Instance));
         }
 
@@ -90,8 +90,8 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
         node2.setPassword(passwd);
 
         connection = (StatefulRedisMasterSlaveConnectionImpl) MasterSlave.connect(client, new Utf8StringCodec(),
-                Arrays.asList(master, slave));
-        connection.setReadFrom(ReadFrom.SLAVE);
+                Arrays.asList(master, replica));
+        connection.setReadFrom(ReadFrom.REPLICA);
     }
 
     @AfterEach
@@ -124,7 +124,7 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
 
         assertThat(matcher.find()).isTrue();
         assertThat(matcher.group(1)).isEqualTo("6483");
-        assertThat(connection.getReadFrom()).isEqualTo(ReadFrom.SLAVE);
+        assertThat(connection.getReadFrom()).isEqualTo(ReadFrom.REPLICA);
     }
 
     @Test
@@ -144,7 +144,7 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
 
         connection = (StatefulRedisMasterSlaveConnectionImpl) MasterSlave.connect(client, new Utf8StringCodec(),
                 Arrays.asList(master));
-        connection.setReadFrom(ReadFrom.SLAVE);
+        connection.setReadFrom(ReadFrom.REPLICA);
 
         assertThatThrownBy(() -> slaveCall(connection)).isInstanceOf(RedisException.class);
     }
@@ -167,7 +167,7 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
         connection.close();
 
         connection = (StatefulRedisMasterSlaveConnectionImpl) MasterSlave.connect(client, new Utf8StringCodec(),
-                Arrays.asList(slave));
+                Arrays.asList(replica));
         connection.setReadFrom(ReadFrom.MASTER_PREFERRED);
 
         assertThat(connection.sync().info()).isNotEmpty();
@@ -179,7 +179,7 @@ class StaticMasterSlaveTest extends AbstractRedisClientTest {
         connection.close();
 
         connection = (StatefulRedisMasterSlaveConnectionImpl) MasterSlave.connect(client, new Utf8StringCodec(),
-                Arrays.asList(slave));
+                Arrays.asList(replica));
 
         assertThatThrownBy(() -> connection.sync().set(key, value)).isInstanceOf(RedisException.class);
     }

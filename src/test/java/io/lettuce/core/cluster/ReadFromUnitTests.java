@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,18 +39,18 @@ class ReadFromUnitTests {
     private Partitions sut = new Partitions();
     private RedisClusterNode nearest = new RedisClusterNode();
     private RedisClusterNode master = new RedisClusterNode();
-    private RedisClusterNode slave = new RedisClusterNode();
+    private RedisClusterNode replica = new RedisClusterNode();
 
     @BeforeEach
     void before() {
 
         master.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.MASTER));
         nearest.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.SLAVE));
-        slave.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.SLAVE));
+        replica.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.SLAVE));
 
         sut.addPartition(nearest);
         sut.addPartition(master);
-        sut.addPartition(slave);
+        sut.addPartition(replica);
     }
 
     @Test
@@ -62,25 +62,25 @@ class ReadFromUnitTests {
     @Test
     void masterPreferred() {
         List<RedisNodeDescription> result = ReadFrom.MASTER_PREFERRED.select(getNodes());
-        assertThat(result).hasSize(3).containsExactly(master, nearest, slave);
+        assertThat(result).hasSize(3).containsExactly(master, nearest, replica);
     }
 
     @Test
-    void slave() {
-        List<RedisNodeDescription> result = ReadFrom.SLAVE.select(getNodes());
-        assertThat(result).hasSize(2).contains(nearest, slave);
+    void replica() {
+        List<RedisNodeDescription> result = ReadFrom.REPLICA.select(getNodes());
+        assertThat(result).hasSize(2).contains(nearest, replica);
     }
 
     @Test
-    void slavePreferred() {
-        List<RedisNodeDescription> result = ReadFrom.SLAVE_PREFERRED.select(getNodes());
-        assertThat(result).hasSize(3).containsExactly(nearest, slave, master);
+    void replicaPreferred() {
+        List<RedisNodeDescription> result = ReadFrom.REPLICA_PREFERRED.select(getNodes());
+        assertThat(result).hasSize(3).containsExactly(nearest, replica, master);
     }
 
     @Test
     void nearest() {
         List<RedisNodeDescription> result = ReadFrom.NEAREST.select(getNodes());
-        assertThat(result).hasSize(3).containsExactly(nearest, master, slave);
+        assertThat(result).hasSize(3).containsExactly(nearest, master, replica);
     }
 
     @Test
@@ -110,12 +110,12 @@ class ReadFromUnitTests {
 
     @Test
     void valueOfSlave() {
-        assertThat(ReadFrom.valueOf("slave")).isEqualTo(ReadFrom.SLAVE);
+        assertThat(ReadFrom.valueOf("slave")).isEqualTo(ReadFrom.REPLICA);
     }
 
     @Test
     void valueOfSlavePreferred() {
-        assertThat(ReadFrom.valueOf("slavePreferred")).isEqualTo(ReadFrom.SLAVE_PREFERRED);
+        assertThat(ReadFrom.valueOf("slavePreferred")).isEqualTo(ReadFrom.REPLICA_PREFERRED);
     }
 
     private ReadFrom.Nodes getNodes() {

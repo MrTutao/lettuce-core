@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,10 +92,20 @@ public class ConnectionBuilder {
         return handlers;
     }
 
+    /**
+     * @deprecated since 5.2. PING during connection handshake becomes mandatory with RESP3. This method will be removed with
+     *             Lettuce 6.
+     */
+    @Deprecated
     public void enablePingBeforeConnect() {
         pingCommandSupplier = PING_COMMAND_SUPPLIER;
     }
 
+    /**
+     * @deprecated since 5.2. PING during connection handshake becomes mandatory with RESP3. This method will be removed with
+     *             Lettuce 6.
+     */
+    @Deprecated
     public void enableAuthPingBeforeConnect() {
         pingCommandSupplier = () -> new AsyncCommand<>(INITIALIZING_CMD_BUILDER.auth(new String(password)));
     }

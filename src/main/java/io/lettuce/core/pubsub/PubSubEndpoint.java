@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.lettuce.core.pubsub;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import io.lettuce.core.ClientOptions;
@@ -25,13 +26,15 @@ import io.lettuce.core.protocol.DefaultEndpoint;
 import io.lettuce.core.protocol.RedisCommand;
 import io.lettuce.core.resource.ClientResources;
 import io.netty.channel.Channel;
-import io.netty.util.internal.ConcurrentSet;
+import io.netty.util.internal.logging.InternalLogger;
+import io.netty.util.internal.logging.InternalLoggerFactory;
 
 /**
  * @author Mark Paluch
  */
 public class PubSubEndpoint<K, V> extends DefaultEndpoint {
 
+    private static final InternalLogger logger = InternalLoggerFactory.getInstance(PubSubEndpoint.class);
     private static final Set<String> ALLOWED_COMMANDS_SUBSCRIBED;
     private static final Set<String> SUBSCRIBE_COMMANDS;
     private final List<RedisPubSubListener<K, V>> listeners = new CopyOnWriteArrayList<>();
@@ -65,8 +68,8 @@ public class PubSubEndpoint<K, V> extends DefaultEndpoint {
 
         super(clientOptions, clientResources);
 
-        this.channels = new ConcurrentSet<>();
-        this.patterns = new ConcurrentSet<>();
+        this.channels = ConcurrentHashMap.newKeySet();
+        this.patterns = ConcurrentHashMap.newKeySet();
     }
 
     /**
@@ -167,7 +170,11 @@ public class PubSubEndpoint<K, V> extends DefaultEndpoint {
         }
 
         updateInternalState(output);
-        notifyListeners(output);
+        try {
+            notifyListeners(output);
+        } catch (Exception e) {
+            logger.error("Unexpected error occurred in RedisPubSubListener callback", e);
+        }
     }
 
     protected void notifyListeners(PubSubOutput<K, V, V> output) {
@@ -231,7 +238,7 @@ public class PubSubEndpoint<K, V> extends DefaultEndpoint {
 
     /**
      * Comparison/equality wrapper with specific {@code byte[]} equals and hashCode implementations.
-     * 
+     *
      * @param <K>
      */
     static class Wrapper<K> {

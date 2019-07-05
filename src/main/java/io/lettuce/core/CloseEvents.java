@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 package io.lettuce.core;
 
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-import io.netty.util.internal.ConcurrentSet;
 
 /**
  * Close Events Facility. Can register/unregister CloseListener and fire a closed event to all registered listeners.
@@ -27,7 +27,7 @@ import io.netty.util.internal.ConcurrentSet;
  */
 class CloseEvents {
 
-    private Set<CloseListener> listeners = new ConcurrentSet<CloseListener>();
+    private Set<CloseListener> listeners = ConcurrentHashMap.newKeySet();
 
     public void fireEventClosed(Object resource) {
         for (CloseListener listener : listeners) {

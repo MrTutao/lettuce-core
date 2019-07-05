@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -472,11 +472,11 @@ public class RedisClusterSetupTest extends TestSupport {
     }
 
     @Test
-    public void readFromSlaveTest() {
+    public void readFromReplicaTest() {
 
         ClusterSetup.setup2Masters(clusterRule);
         RedisAdvancedClusterAsyncCommands<String, String> clusterConnection = clusterClient.connect().async();
-        clusterConnection.getStatefulConnection().setReadFrom(ReadFrom.SLAVE);
+        clusterConnection.getStatefulConnection().setReadFrom(ReadFrom.REPLICA);
 
         Futures.await(clusterConnection.set(key, value));
 

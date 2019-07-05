@@ -1,11 +1,12 @@
 ---
 name: 🚀 Feature Request
 about: I have a suggestion (and may want to implement it 🙂)!
+labels: 'type: enhancement'
 ---
 
 ## Feature Request
 
-<!-- First of all: Have you checked the docs https://github.com/lettuce-io/lettuce-core/wiki, GitHub issues, or StackOverflow whether someone else has already reported your issue? Maybe the feature already exists?-->
+<!-- First of all: Have you checked the docs https://github.com/lettuce-io/lettuce-core/wiki, GitHub issues, or Stack Overflow whether someone else has already reported your issue? Maybe the feature already exists?-->
 
 #### Is your feature request related to a problem? Please describe
 

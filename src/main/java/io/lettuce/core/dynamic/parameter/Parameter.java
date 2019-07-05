@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import io.lettuce.core.dynamic.support.*;
 import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.internal.LettuceClassUtils;
-import io.netty.util.internal.ConcurrentSet;
 
 /**
  * Abstracts a method parameter and exposes access to type and parameter information.
@@ -42,7 +41,7 @@ public class Parameter {
     private final TypeInformation<?> typeInformation;
     private final MethodParameter methodParameter;
     private final Map<Class<? extends Annotation>, Annotation> annotationCache = new ConcurrentHashMap<>();
-    private final Set<Class<? extends Annotation>> absentCache = new ConcurrentSet<>();
+    private final Set<Class<? extends Annotation>> absentCache = ConcurrentHashMap.newKeySet();
     private final List<Annotation> annotations;
 
     public Parameter(Method method, int parameterIndex) {

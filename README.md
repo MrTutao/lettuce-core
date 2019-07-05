@@ -1,4 +1,4 @@
-lettuce - Advanced Java Redis client
+<img src="https://avatars2.githubusercontent.com/u/25752188?v=4" width="50" height="50"> Lettuce - Advanced Java Redis client
 ===============================
 
 [![Build Status](https://travis-ci.org/lettuce-io/lettuce-core.svg)](https://travis-ci.org/lettuce-io/lettuce-core) [![codecov](https://codecov.io/gh/lettuce-io/lettuce-core/branch/master/graph/badge.svg)](https://codecov.io/gh/lettuce-io/lettuce-core)
@@ -12,7 +12,7 @@ Supports advanced Redis features such as Sentinel, Cluster, Pipelining, Auto-Rec
 
 This version of Lettuce has been tested against the latest Redis source-build.
 
-* [synchronous](https://github.com/lettuce-io/lettuce-core/wiki/Basic-usage), [asynchronous](https://github.com/lettuce-io/lettuce-core/wiki/Asynchronous-API-%284.0%29) and [reactive](https://github.com/lettuce-io/lettuce-core/wiki/Reactive-API-%284.0%29) usage
+* [synchronous](https://github.com/lettuce-io/lettuce-core/wiki/Basic-usage), [asynchronous](https://github.com/lettuce-io/lettuce-core/wiki/Asynchronous-API-%284.0%29) and [reactive](https://github.com/lettuce-io/lettuce-core/wiki/Reactive-API-%285.0%29) usage
 * [Redis Sentinel](https://github.com/lettuce-io/lettuce-core/wiki/Redis-Sentinel)
 * [Redis Cluster](https://github.com/lettuce-io/lettuce-core/wiki/Redis-Cluster)
 * [SSL](https://github.com/lettuce-io/lettuce-core/wiki/SSL-Connections) and [Unix Domain Socket](https://github.com/lettuce-io/lettuce-core/wiki/Unix-Domain-Sockets) connections
@@ -28,10 +28,11 @@ See the [reference documentation](https://lettuce.io/docs/) and [Wiki](https://g
 Communication
 ---------------
 
-* Google Group: [lettuce-redis-client-users](https://groups.google.com/d/forum/lettuce-redis-client-users) or lettuce-redis-client-users@googlegroups.com
-* [![Join the chat at https://gitter.im/lettuce-io/Lobby](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/lettuce-io/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+* Google Group/Mailing List (General discussion, announcements and releases): [lettuce-redis-client-users](https://groups.google.com/d/forum/lettuce-redis-client-users) or lettuce-redis-client-users@googlegroups.com
+* Stack Overflow (Questions): [https://stackoverflow.com/questions/tagged/lettuce](https://stackoverflow.com/questions/tagged/lettuce)
+* Gitter (General discussion): [![Join the chat at https://gitter.im/lettuce-io/Lobby](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/lettuce-io/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 * Twitter: [@LettuceDriver](https://twitter.com/LettuceDriver)
-* [GitHub Issues](https://github.com/lettuce-io/lettuce-core/issues)
+* [GitHub Issues](https://github.com/lettuce-io/lettuce-core/issues) (Bug reports, feature requests)
 
 
 Documentation
@@ -120,15 +121,15 @@ Reactive API
 ```java
 StatefulRedisConnection<String, String> connection = client.connect();
 RedisStringReactiveCommands<String, String> reactive = connection.reactive();
-Observable<String> set = reactive.set("key", "value")
-Observable<String> get = reactive.get("key")
+Mono<String> set = reactive.set("key", "value");
+Mono<String> get = reactive.get("key");
 
 set.subscribe();
 
-get.toBlocking().single() == "value"
+get.block() == "value"
 ```
 
-See [Reactive API](https://github.com/lettuce-io/lettuce-core/wiki/Reactive-API-%284.0%29) for further details.
+See [Reactive API](https://github.com/lettuce-io/lettuce-core/wiki/Reactive-API-%285.0%29) for further details.
 
 Pub/Sub
 -------

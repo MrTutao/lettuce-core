@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,15 @@ package io.lettuce.core.protocol;
  *
  * @author Will Glozer
  * @author Mark Paluch
+ * @author Zhang Jessey
  */
 public enum CommandKeyword implements ProtocolKeyword {
 
     ADDR, ADDSLOTS, AFTER, AGGREGATE, ALPHA, AND, ASK, ASC, ASYNC, BEFORE, BLOCK, BUMPEPOCH,
 
-    BY, CHANNELS, COPY, COUNT, COUNTKEYSINSLOT, CREATE, DELSLOTS, DESC, SOFT, HARD, ENCODING,
+    BY, CHANNELS, COPY, COUNT, COUNTKEYSINSLOT, CONSUMERS, CREATE, DELSLOTS, DESC, SOFT, HARD, ENCODING,
 
-    FAILOVER, FORGET, FLUSH, FORCE, FLUSHSLOTS, GETNAME, GETKEYSINSLOT, GROUP, HTSTATS, ID, IDLE,
+    FAILOVER, FORGET, FLUSH, FORCE, FLUSHSLOTS, GETNAME, GETKEYSINSLOT, GROUP, GROUPS, HTSTATS, ID, IDLE,
 
     IDLETIME, JUSTID, KILL, KEYSLOT, LEN, LIMIT, LIST, LOAD, MATCH,
 
@@ -37,9 +38,9 @@ public enum CommandKeyword implements ProtocolKeyword {
 
     RESETSTAT, RESTART, RETRYCOUNT, REWRITE, SAVECONFIG, SDSLEN, SETNAME, SETSLOT, SLOTS, STABLE,
 
-    MIGRATING, IMPORTING, SKIPME, SLAVES, STORE, SUM, SEGFAULT, UNBLOCK, WEIGHTS,
+    MIGRATING, IMPORTING, SKIPME, SLAVES, STREAM, STORE, SUM, SEGFAULT, UNBLOCK, WEIGHTS,
 
-    WITHSCORES, XOR;
+    WITHSCORES, XOR, USAGE;
 
     public final byte[] bytes;
 

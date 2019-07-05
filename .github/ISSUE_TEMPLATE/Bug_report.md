@@ -1,27 +1,42 @@
 ---
 name: 🐛 Bug Report
 about: If something isn't working as expected 🤔.
+labels: 'type: bug'
 ---
 
 ## Bug Report
 
-<!-- First of all: Have you checked the docs https://github.com/lettuce-io/lettuce-core/wiki, GitHub issues, or StackOverflow whether someone else has already reported your issue? -->
+<!-- First of all: Have you checked the docs https://github.com/lettuce-io/lettuce-core/wiki, GitHub issues, or Stack Overflow whether someone else has already reported your issue? -->
 
 #### Current Behavior
 
-A clear and concise description of the behavior.
+<!-- A clear and concise description of the behavior.-->
+
+<details>
+<summary>Stack trace</summary>
+
+```java
+// your stack trace here;
+```
+
+</details>
 
 #### Input Code
 
-- Java/Kotlin/Scala/Groovy/… or Repo link if applicable:
+<!-- Java/Kotlin/Scala/Groovy/… or Repo link if applicable: -->
+
+<details>
+<summary>Input Code</summary>
 
 ```java
 // your code here;
 ```
 
+</details>
+
 #### Expected behavior/code
 
-A clear and concise description of what you expected to happen (or code).
+<!-- A clear and concise description of what you expected to happen (or code). -->
 
 #### Environment
 
@@ -30,8 +45,8 @@ A clear and concise description of what you expected to happen (or code).
 
 #### Possible Solution
 
-<!--- Only if you have suggestions on a fix for the bug -->
+<!-- Only if you have suggestions on a fix for the bug -->
 
 #### Additional context
 
-Add any other context about the problem here. Do not add code as screenshots.
+<!-- Add any other context about the problem here. Do not add code as screenshots. -->

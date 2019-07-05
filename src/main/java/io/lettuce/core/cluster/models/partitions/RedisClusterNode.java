@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.lettuce.core.cluster.models.partitions;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.function.IntConsumer;
 
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.cluster.SlotHash;
@@ -26,13 +27,14 @@ import io.lettuce.core.models.role.RedisNodeDescription;
 /**
  * Representation of a Redis Cluster node. A {@link RedisClusterNode} is identified by its {@code nodeId}.
  * <p/>
- * A {@link RedisClusterNode} can be a {@link #getRole() responsible master} or slave. Masters can be responsible for zero to
- * {@link io.lettuce.core.cluster.SlotHash#SLOT_COUNT 16384} slots. Each slave refers to exactly one {@link #getSlaveOf()
+ * A {@link RedisClusterNode} can be a {@link #getRole() responsible master} or replica. Masters can be responsible for zero to
+ * {@link io.lettuce.core.cluster.SlotHash#SLOT_COUNT 16384} slots. Each replica refers to exactly one {@link #getSlaveOf()
  * master}. Nodes can have different {@link io.lettuce.core.cluster.models.partitions.RedisClusterNode.NodeFlag flags} assigned.
  * <p/>
  * This class is mutable and not thread-safe if mutated by multiple threads concurrently.
  *
  * @author Mark Paluch
+ * @author Alessandro Simi
  * @since 3.0
  */
 @SuppressWarnings("serial")
@@ -66,6 +68,23 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
         this.configEpoch = configEpoch;
 
         setSlotBits(slots);
+        setFlags(flags);
+    }
+
+    RedisClusterNode(RedisURI uri, String nodeId, boolean connected, String slaveOf, long pingSentTimestamp,
+            long pongReceivedTimestamp, long configEpoch, BitSet slots, Set<NodeFlag> flags) {
+
+        this.uri = uri;
+        this.nodeId = nodeId;
+        this.connected = connected;
+        this.slaveOf = slaveOf;
+        this.pingSentTimestamp = pingSentTimestamp;
+        this.pongReceivedTimestamp = pongReceivedTimestamp;
+        this.configEpoch = configEpoch;
+
+        this.slots = new BitSet(slots.length());
+        this.slots.or(slots);
+
         setFlags(flags);
     }
 
@@ -225,6 +244,28 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
     }
 
     /**
+     * Performs the given action for each slot of this {@link RedisClusterNode} until all elements have been processed or the
+     * action throws an exception. Unless otherwise specified by the implementing class, actions are performed in the order of
+     * iteration (if an iteration order is specified). Exceptions thrown by the action are relayed to the caller.
+     *
+     * @param consumer
+     * @since 5.2
+     */
+    public void forEachSlot(IntConsumer consumer) {
+
+        if (slots == null || slots.isEmpty()) {
+            return;
+        }
+
+        for (int i = 0; i < this.slots.length(); i++) {
+
+            if (this.slots.get(i)) {
+                consumer.accept(i);
+            }
+        }
+    }
+
+    /**
      * Sets the list of slots for which this {@link RedisClusterNode} is the
      * {@link io.lettuce.core.cluster.models.partitions.RedisClusterNode.NodeFlag#MASTER}. The list is empty if this node is not
      * a master or the node is not responsible for any slots at all.
@@ -253,6 +294,15 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
         for (Integer slot : slots) {
             this.slots.set(slot);
         }
+    }
+
+    public boolean hasSameSlotsAs(RedisClusterNode other) {
+
+        if (this.slots == null || other.slots == null) {
+            return false;
+        }
+
+        return this.slots.equals(other.slots);
     }
 
     public Set<NodeFlag> getFlags() {
@@ -358,6 +408,6 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
      * Redis Cluster node flags.
      */
     public enum NodeFlag {
-        NOFLAGS, MYSELF, SLAVE, MASTER, EVENTUAL_FAIL, FAIL, HANDSHAKE, NOADDR;
+        NOFLAGS, MYSELF, SLAVE, REPLICA, MASTER, EVENTUAL_FAIL, FAIL, HANDSHAKE, NOADDR;
     }
 }

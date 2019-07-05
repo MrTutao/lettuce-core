@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,7 @@ package io.lettuce.core.masterslave;
 import static io.lettuce.core.masterslave.MasterSlaveUtils.findNodeByHostAndPort;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 import reactor.core.publisher.Flux;
@@ -34,7 +31,6 @@ import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.internal.AsyncConnectionProvider;
 import io.lettuce.core.models.role.RedisInstance;
 import io.lettuce.core.models.role.RedisNodeDescription;
-import io.netty.util.internal.ConcurrentSet;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -43,7 +39,9 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
  *
  * @author Mark Paluch
  * @since 4.1
+ * @deprecated will be moved to {@code masterreplica} package with version 6.
  */
+@Deprecated
 public class MasterSlaveConnectionProvider<K, V> {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(MasterSlaveConnectionProvider.class);
@@ -144,7 +142,14 @@ public class MasterSlaveConnectionProvider<K, V> {
                     connections = connections.concatWith(Mono.fromFuture(getConnection(node)));
                 }
 
-                return connections.filter(StatefulConnection::isOpen).next().switchIfEmpty(connections.next()).toFuture();
+                if (OrderingReadFromAccessor.isOrderSensitive(readFrom) || selection.size() == 1) {
+                    return connections.filter(StatefulConnection::isOpen).next().switchIfEmpty(connections.next()).toFuture();
+                }
+
+                return connections.filter(StatefulConnection::isOpen).collectList().map(it -> {
+                    int index = ThreadLocalRandom.current().nextInt(it.size());
+                    return it.get(index);
+                }).switchIfEmpty(connections.next()).toFuture();
             } catch (RuntimeException e) {
                 throw Exceptions.bubble(e);
             }
@@ -260,7 +265,7 @@ public class MasterSlaveConnectionProvider<K, V> {
     @Deprecated
     protected Collection<StatefulRedisConnection<K, V>> allConnections() {
 
-        Set<StatefulRedisConnection<K, V>> set = new ConcurrentSet<>();
+        Set<StatefulRedisConnection<K, V>> set = ConcurrentHashMap.newKeySet();
         connectionProvider.forEach(set::add);
         return set;
     }
@@ -318,11 +323,8 @@ public class MasterSlaveConnectionProvider<K, V> {
         @Override
         public ConnectionFuture<StatefulRedisConnection<K, V>> apply(ConnectionKey key) {
 
-            RedisURI.Builder builder = RedisURI.Builder
-                    .redis(key.host, key.port)
-                    .withSsl(initialRedisUri.isSsl())
-                    .withVerifyPeer(initialRedisUri.isVerifyPeer())
-                    .withStartTls(initialRedisUri.isStartTls());
+            RedisURI.Builder builder = RedisURI.Builder.redis(key.host, key.port).withSsl(initialRedisUri.isSsl())
+                    .withVerifyPeer(initialRedisUri.isVerifyPeer()).withStartTls(initialRedisUri.isStartTls());
 
             if (initialRedisUri.getPassword() != null && initialRedisUri.getPassword().length != 0) {
                 builder.withPassword(initialRedisUri.getPassword());
@@ -338,8 +340,8 @@ public class MasterSlaveConnectionProvider<K, V> {
 
             connectionFuture.thenAccept(connection -> {
                 synchronized (stateLock) {
-                connection.setAutoFlushCommands(autoFlushCommands);
-            }
+                    connection.setAutoFlushCommands(autoFlushCommands);
+                }
             });
 
             return connectionFuture;

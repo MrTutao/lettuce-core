@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 the original author or authors.
+ * Copyright 2017-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,9 +96,9 @@ class MasterSlaveTopologyRefreshUnitTests {
         MasterSlaveTopologyRefresh refresh = new MasterSlaveTopologyRefresh(connectionFactory, executorService, provider);
 
         CompletableFuture<StatefulRedisConnection<String, String>> master = CompletableFuture.completedFuture(connection);
-        CompletableFuture<StatefulRedisConnection<String, String>> slave = CompletableFuture.completedFuture(connection);
+        CompletableFuture<StatefulRedisConnection<String, String>> replica = CompletableFuture.completedFuture(connection);
         when(connectionFactory.connectToNodeAsync(any(), any())).thenReturn((CompletableFuture) master,
-                (CompletableFuture) slave);
+                (CompletableFuture) replica);
 
         RedisURI redisURI = new RedisURI();
         redisURI.setTimeout(Duration.ofMillis(1));

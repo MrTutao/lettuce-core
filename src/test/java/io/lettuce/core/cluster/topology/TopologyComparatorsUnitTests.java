@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.util.Lists.newArrayList;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +31,10 @@ import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.core.internal.LettuceLists;
 
 /**
+ * Unit tests for {@link TopologyComparators}.
+ *
  * @author Mark Paluch
+ * @author Alessandro Simi
  */
 class TopologyComparatorsUnitTests {
 
@@ -296,7 +296,7 @@ class TopologyComparatorsUnitTests {
     }
 
     @Test
-    void isChangedFlagsChangedSlaveToMaster() {
+    void isChangedFlagsChangedReplicaToMaster() {
         String nodes1 = "3d005a179da7d8dc1adae6409d47b39c369e992b 127.0.0.1:7380 slave - 0 1401258245007 2 disconnected 8000-11999\n"
                 + "c37ab8396be428403d4e55c0d317348be27ed973 127.0.0.1:7381 master - 111 1401258245007 222 connected 7000 12000 12002-16383\n";
 
@@ -309,7 +309,29 @@ class TopologyComparatorsUnitTests {
     }
 
     @Test
-    void isChangedFlagsChangedMasterToSlave() {
+    void nodesShouldHaveSameSlots() {
+        RedisClusterNode nodeA = createNode(1, 4, 36, 98);
+        RedisClusterNode nodeB = createNode(4, 36, 1, 98);
+        assertThat(nodeA.getSlots().containsAll(nodeB.getSlots())).isTrue();
+        assertThat(nodeA.hasSameSlotsAs(nodeB)).isTrue();
+    }
+
+    @Test
+    void nodesShouldNotHaveSameSlots() {
+        RedisClusterNode nodeA = createNode(1, 4, 36, 99);
+        RedisClusterNode nodeB = createNode(4, 36, 1, 100);
+        assertThat(nodeA.getSlots().containsAll(nodeB.getSlots())).isFalse();
+        assertThat(nodeA.hasSameSlotsAs(nodeB)).isFalse();
+    }
+
+    private RedisClusterNode createNode(Integer... slots) {
+        RedisClusterNode node = new RedisClusterNode();
+        node.setSlots(Arrays.asList(slots));
+        return node;
+    }
+
+    @Test
+    void isChangedFlagsChangedMasterToReplica() {
         String nodes1 = "3d005a179da7d8dc1adae6409d47b39c369e992b 127.0.0.1:7380 master - 0 1401258245007 2 disconnected 8000-11999\n"
                 + "c37ab8396be428403d4e55c0d317348be27ed973 127.0.0.1:7381 master - 111 1401258245007 222 connected 7000 12000 12002-16383\n";
 

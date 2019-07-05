@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,26 +34,52 @@ public abstract class ReadFrom {
     public static final ReadFrom MASTER = new ReadFromImpl.ReadFromMaster();
 
     /**
-     * Setting to read preferred from the master and fall back to a slave if the master is not available.
+     * Setting to read preferred from the master and fall back to a replica if the master is not available.
      */
     public static final ReadFrom MASTER_PREFERRED = new ReadFromImpl.ReadFromMasterPreferred();
 
     /**
-     * Setting to read preferred from slaves and fall back to master if no slave is not available.
+     * Setting to read preferred from replica and fall back to master if no replica is not available.
      *
-     * @since 4.4
+     * @since 5.2
      */
-    public static final ReadFrom SLAVE_PREFERRED = new ReadFromImpl.ReadFromSlavePreferred();
+    public static final ReadFrom REPLICA_PREFERRED = new ReadFromImpl.ReadFromReplicaPreferred();
 
     /**
-     * Setting to read from the slave only.
+     * Setting to read preferred from replicas and fall back to master if no replica is not available.
+     *
+     * @since 4.4
+     * @deprecated Renamed to {@link #REPLICA_PREFERRED}.
      */
-    public static final ReadFrom SLAVE = new ReadFromImpl.ReadFromSlave();
+    @Deprecated
+    public static final ReadFrom SLAVE_PREFERRED = REPLICA_PREFERRED;
+
+    /**
+     * Setting to read from the replica only.
+     *
+     * @since 5.2
+     */
+    public static final ReadFrom REPLICA = new ReadFromImpl.ReadFromReplica();
+
+    /**
+     * Setting to read from the replica only.
+     *
+     * @deprecated renamed to {@link #REPLICA}.
+     */
+    @Deprecated
+    public static final ReadFrom SLAVE = REPLICA;
 
     /**
      * Setting to read from the nearest node.
      */
     public static final ReadFrom NEAREST = new ReadFromImpl.ReadFromNearest();
+
+    /**
+     * Setting to read from any node.
+     *
+     * @since 5.2
+     */
+    public static final ReadFrom ANY = new ReadFromImpl.ReadFromAnyNode();
 
     /**
      * Chooses the nodes from the matching Redis nodes that match this read selector.
@@ -62,6 +88,17 @@ public abstract class ReadFrom {
      * @return List of {@link RedisNodeDescription}s that are selected for reading
      */
     public abstract List<RedisNodeDescription> select(Nodes nodes);
+
+    /**
+     * Returns whether this {@link ReadFrom} requires ordering of the resulting {@link RedisNodeDescription nodes}.
+     *
+     * @return {@literal true} if code using {@link ReadFrom} should retain ordering or {@literal false} to allow reordering of
+     *         {@link RedisNodeDescription nodes}.
+     * @since 5.2
+     */
+    boolean isOrderSensitive() {
+        return false;
+    }
 
     /**
      * Retrieve the {@link ReadFrom} preset by name.
@@ -84,16 +121,20 @@ public abstract class ReadFrom {
             return MASTER_PREFERRED;
         }
 
-        if (name.equalsIgnoreCase("slave")) {
-            return SLAVE;
+        if (name.equalsIgnoreCase("slave") || name.equalsIgnoreCase("replica")) {
+            return REPLICA;
         }
 
-        if (name.equalsIgnoreCase("slavePreferred")) {
-            return SLAVE_PREFERRED;
+        if (name.equalsIgnoreCase("slavePreferred") || name.equalsIgnoreCase("replicaPreferred")) {
+            return REPLICA_PREFERRED;
         }
 
         if (name.equalsIgnoreCase("nearest")) {
             return NEAREST;
+        }
+
+        if (name.equalsIgnoreCase("any")) {
+            return ANY;
         }
 
         throw new IllegalArgumentException("ReadFrom " + name + " not supported");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ class MasterSlaveTest extends AbstractRedisClientTest {
     private RedisAsyncCommands<String, String> connectionToNode2;
 
     private RedisURI master;
-    private RedisURI slave;
+    private RedisURI replica;
 
     @BeforeEach
     void before() throws Exception {
@@ -71,14 +71,14 @@ class MasterSlaveTest extends AbstractRedisClientTest {
 
         if (node1Instance.getRole() == RedisInstance.Role.MASTER && node2Instance.getRole() == RedisInstance.Role.SLAVE) {
             master = node1;
-            slave = node2;
+            replica = node2;
         } else if (node2Instance.getRole() == RedisInstance.Role.MASTER
                 && node1Instance.getRole() == RedisInstance.Role.SLAVE) {
             master = node2;
-            slave = node1;
+            replica = node1;
         } else {
             assumeTrue(false, String.format(
-                    "Cannot run the test because I don't have a distinct master and slave but %s and %s", node1Instance,
+                    "Cannot run the test because I don't have a distinct master and replica but %s and %s", node1Instance,
                     node2Instance));
         }
 
@@ -91,7 +91,7 @@ class MasterSlaveTest extends AbstractRedisClientTest {
         connectionToNode2.auth(passwd);
 
         connection = (StatefulRedisMasterSlaveConnectionImpl) MasterSlave.connect(client, new Utf8StringCodec(), masterURI);
-        connection.setReadFrom(ReadFrom.SLAVE);
+        connection.setReadFrom(ReadFrom.REPLICA);
     }
 
     @AfterEach
@@ -136,8 +136,8 @@ class MasterSlaveTest extends AbstractRedisClientTest {
         Matcher matcher = pattern.matcher(server);
 
         assertThat(matcher.find()).isTrue();
-        assertThat(matcher.group(1)).isEqualTo("" + slave.getPort());
-        assertThat(connection.getReadFrom()).isEqualTo(ReadFrom.SLAVE);
+        assertThat(matcher.group(1)).isEqualTo("" + replica.getPort());
+        assertThat(connection.getReadFrom()).isEqualTo(ReadFrom.REPLICA);
     }
 
     @Test

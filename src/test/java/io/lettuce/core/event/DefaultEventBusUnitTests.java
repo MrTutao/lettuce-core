@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ class DefaultEventBusUnitTests {
     @Test
     void publishToMultipleSubscribers() throws Exception {
 
-        EventBus sut = new DefaultEventBus(Schedulers.immediate());
+        EventBus sut = new DefaultEventBus(Schedulers.parallel());
 
         ArrayBlockingQueue<Event> arrayQueue = new ArrayBlockingQueue<>(5);
 

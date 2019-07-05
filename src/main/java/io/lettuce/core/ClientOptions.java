@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,6 @@ public class ClientOptions implements Serializable {
     private final SslOptions sslOptions;
     private final TimeoutOptions timeoutOptions;
     private final int bufferUsageRatio;
-    private final Builder builder;
 
     protected ClientOptions(Builder builder) {
         this.pingBeforeActivateConnection = builder.pingBeforeActivateConnection;
@@ -66,7 +65,6 @@ public class ClientOptions implements Serializable {
         this.sslOptions = builder.sslOptions;
         this.timeoutOptions = builder.timeoutOptions;
         this.bufferUsageRatio = builder.bufferUsageRatio;
-        this.builder = builder;
     }
 
     protected ClientOptions(ClientOptions original) {
@@ -81,7 +79,6 @@ public class ClientOptions implements Serializable {
         this.sslOptions = original.getSslOptions();
         this.timeoutOptions = original.getTimeoutOptions();
         this.bufferUsageRatio = original.getBufferUsageRatio();
-        this.builder = original.builder;
     }
 
     /**
@@ -138,7 +135,10 @@ public class ClientOptions implements Serializable {
          *
          * @param pingBeforeActivateConnection true/false
          * @return {@code this}
+         * @deprecated since 5.2. PING during connection handshake becomes mandatory with RESP3. This method will be removed
+         *             with Lettuce 6.
          */
+        @Deprecated
         public Builder pingBeforeActivateConnection(boolean pingBeforeActivateConnection) {
             this.pingBeforeActivateConnection = pingBeforeActivateConnection;
             return this;
@@ -310,7 +310,16 @@ public class ClientOptions implements Serializable {
      * @since 5.1
      */
     public ClientOptions.Builder mutate() {
-        return this.builder;
+        Builder builder = new Builder();
+
+        builder.autoReconnect(isAutoReconnect()).bufferUsageRatio(getBufferUsageRatio())
+                .cancelCommandsOnReconnectFailure(isCancelCommandsOnReconnectFailure())
+                .disconnectedBehavior(getDisconnectedBehavior()).publishOnScheduler(isPublishOnScheduler())
+                .pingBeforeActivateConnection(isPingBeforeActivateConnection()).requestQueueSize(getRequestQueueSize())
+                .socketOptions(getSocketOptions()).sslOptions(getSslOptions())
+                .suspendReconnectOnProtocolFailure(isSuspendReconnectOnProtocolFailure()).timeoutOptions(getTimeoutOptions());
+
+        return builder;
     }
 
     /**
@@ -319,7 +328,10 @@ public class ClientOptions implements Serializable {
      * activated and enabled for use. If the check fails, the connect/reconnect is treated as failure.
      *
      * @return {@literal true} if {@literal PING} barrier is enabled.
+     * @deprecated since 5.2. PING during connection handshake becomes mandatory with RESP3. This method will be removed with
+     *             Lettuce 6.
      */
+    @Deprecated
     public boolean isPingBeforeActivateConnection() {
         return pingBeforeActivateConnection;
     }

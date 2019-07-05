@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import io.lettuce.core.protocol.*;
  * @param <K>
  * @param <V>
  * @author Mark Paluch
+ * @author Zhang Jessey
  */
 @SuppressWarnings({ "unchecked", "varargs" })
 class RedisCommandBuilder<K, V> extends BaseRedisCommandBuilder<K, V> {
@@ -1189,6 +1190,10 @@ class RedisCommandBuilder<K, V> extends BaseRedisCommandBuilder<K, V> {
         return createCommand(LTRIM, new StatusOutput<>(codec), args);
     }
 
+    Command<K, V, Long> memoryUsage(K key) {
+        return createCommand(MEMORY, new IntegerOutput<>(codec), new CommandArgs<>(codec).add(USAGE).add(key.toString()));
+    }
+
     Command<K, V, List<V>> mget(K... keys) {
         notEmpty(keys);
 
@@ -2181,6 +2186,30 @@ class RedisCommandBuilder<K, V> extends BaseRedisCommandBuilder<K, V> {
                 .add(offset.getOffset());
 
         return createCommand(XGROUP, new StatusOutput<>(codec), args);
+    }
+
+    public Command<K, V, List<Object>> xinfoStream(K key) {
+        notNullKey(key);
+
+        CommandArgs<K, V> args = new CommandArgs<>(codec).add(STREAM).addKey(key);
+
+        return createCommand(XINFO, new ArrayOutput<>(codec), args);
+    }
+
+    public Command<K, V, List<Object>> xinfoGroups(K key) {
+        notNullKey(key);
+
+        CommandArgs<K, V> args = new CommandArgs<>(codec).add(GROUPS).addKey(key);
+
+        return createCommand(XINFO, new ArrayOutput<>(codec), args);
+    }
+
+    public Command<K, V, List<Object>> xinfoConsumers(K key, K group) {
+        notNullKey(key);
+
+        CommandArgs<K, V> args = new CommandArgs<>(codec).add(CONSUMERS).addKey(key).addKey(group);
+
+        return createCommand(XINFO, new ArrayOutput<>(codec), args);
     }
 
     public Command<K, V, Long> xlen(K key) {

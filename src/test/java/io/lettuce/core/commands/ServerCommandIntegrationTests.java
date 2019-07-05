@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ import io.lettuce.test.settings.TestSettings;
 /**
  * @author Will Glozer
  * @author Mark Paluch
+ * @author Zhang Jessey
  */
 @ExtendWith(LettuceExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -325,6 +326,16 @@ public class ServerCommandIntegrationTests extends TestSupport {
     void lastsave() {
         Date start = new Date(System.currentTimeMillis() / 1000);
         assertThat(start.compareTo(redis.lastsave()) <= 0).isTrue();
+    }
+
+    @Test
+    @EnabledOnCommand("MEMORY")
+    void memoryUsage() {
+
+        redis.set("foo", "bar");
+        Long usedMemory = redis.memoryUsage("foo");
+
+        assertThat(usedMemory).isGreaterThanOrEqualTo(3);
     }
 
     @Test

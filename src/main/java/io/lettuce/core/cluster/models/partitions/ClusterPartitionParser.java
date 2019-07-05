@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,11 @@
 package io.lettuce.core.cluster.models.partitions;
 
 import java.util.*;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import io.lettuce.core.LettuceStrings;
 import io.lettuce.core.RedisException;
 import io.lettuce.core.RedisURI;
+import io.lettuce.core.cluster.SlotHash;
 import io.lettuce.core.internal.HostAndPort;
 import io.lettuce.core.internal.LettuceLists;
 
@@ -37,9 +36,6 @@ public class ClusterPartitionParser {
 
     private static final String TOKEN_SLOT_IN_TRANSITION = "[";
     private static final char TOKEN_NODE_SEPARATOR = '\n';
-    private static final Pattern TOKEN_PATTERN = Pattern.compile(Character.toString(TOKEN_NODE_SEPARATOR));
-    private static final Pattern SPACE_PATTERN = Pattern.compile(" ");
-    private static final Pattern DASH_PATTERN = Pattern.compile("\\-");
     private static final Map<String, RedisClusterNode.NodeFlag> FLAG_MAPPING;
 
     static {
@@ -49,6 +45,7 @@ public class ClusterPartitionParser {
         map.put("myself", RedisClusterNode.NodeFlag.MYSELF);
         map.put("master", RedisClusterNode.NodeFlag.MASTER);
         map.put("slave", RedisClusterNode.NodeFlag.SLAVE);
+        map.put("replica", RedisClusterNode.NodeFlag.REPLICA);
         map.put("fail?", RedisClusterNode.NodeFlag.EVENTUAL_FAIL);
         map.put("fail", RedisClusterNode.NodeFlag.FAIL);
         map.put("handshake", RedisClusterNode.NodeFlag.HANDSHAKE);
@@ -73,9 +70,18 @@ public class ClusterPartitionParser {
         Partitions result = new Partitions();
 
         try {
-            List<RedisClusterNode> mappedNodes = TOKEN_PATTERN.splitAsStream(nodes).filter(s -> !s.isEmpty())
-                    .map(ClusterPartitionParser::parseNode)
-                    .collect(Collectors.toList());
+
+            String[] lines = nodes.split(Character.toString(TOKEN_NODE_SEPARATOR));
+            List<RedisClusterNode> mappedNodes = new ArrayList<>(lines.length);
+
+            for (String line : lines) {
+
+                if (line.isEmpty()) {
+                    continue;
+
+                }
+                mappedNodes.add(ClusterPartitionParser.parseNode(line));
+            }
             result.addAll(mappedNodes);
         } catch (Exception e) {
             throw new RedisException("Cannot parse " + nodes, e);
@@ -86,14 +92,14 @@ public class ClusterPartitionParser {
 
     private static RedisClusterNode parseNode(String nodeInformation) {
 
-        Iterator<String> iterator = SPACE_PATTERN.splitAsStream(nodeInformation).iterator();
+        Iterator<String> iterator = Arrays.asList(nodeInformation.split(" ")).iterator();
 
         String nodeId = iterator.next();
         boolean connected = false;
         RedisURI uri = null;
 
         String hostAndPortPart = iterator.next();
-        if(hostAndPortPart.contains("@")) {
+        if (hostAndPortPart.contains("@")) {
             hostAndPortPart = hostAndPortPart.substring(0, hostAndPortPart.indexOf('@'));
         }
 
@@ -108,8 +114,8 @@ public class ClusterPartitionParser {
 
         Set<RedisClusterNode.NodeFlag> nodeFlags = readFlags(flagStrings);
 
-        String slaveOfString = iterator.next(); // (nodeId or -)
-        String slaveOf = "-".equals(slaveOfString) ? null : slaveOfString;
+        String replicaOfString = iterator.next(); // (nodeId or -)
+        String replicaOf = "-".equals(replicaOfString) ? null : replicaOfString;
 
         long pingSentTs = getLongFromIterator(iterator, 0);
         long pongReceivedTs = getLongFromIterator(iterator, 0);
@@ -122,9 +128,9 @@ public class ClusterPartitionParser {
         }
 
         List<String> slotStrings = LettuceLists.newList(iterator); // slot, from-to [slot->-nodeID] [slot-<-nodeID]
-        List<Integer> slots = readSlots(slotStrings);
+        BitSet slots = readSlots(slotStrings);
 
-        RedisClusterNode partition = new RedisClusterNode(uri, nodeId, connected, slaveOf, pingSentTs, pongReceivedTs,
+        RedisClusterNode partition = new RedisClusterNode(uri, nodeId, connected, replicaOf, pingSentTs, pongReceivedTs,
                 configEpoch, slots, nodeFlags);
 
         return partition;
@@ -139,12 +145,17 @@ public class ClusterPartitionParser {
                 flags.add(FLAG_MAPPING.get(flagString));
             }
         }
+
+        if (flags.contains(RedisClusterNode.NodeFlag.SLAVE)) {
+            flags.add(RedisClusterNode.NodeFlag.REPLICA);
+        }
+
         return Collections.unmodifiableSet(flags);
     }
 
-    private static List<Integer> readSlots(List<String> slotStrings) {
+    private static BitSet readSlots(List<String> slotStrings) {
 
-        List<Integer> slots = new ArrayList<>();
+        BitSet slots = new BitSet(SlotHash.SLOT_COUNT);
         for (String slotString : slotStrings) {
 
             if (slotString.startsWith(TOKEN_SLOT_IN_TRANSITION)) {
@@ -155,21 +166,21 @@ public class ClusterPartitionParser {
 
             if (slotString.contains("-")) {
                 // slot range
-                Iterator<String> it = DASH_PATTERN.splitAsStream(slotString).iterator();
+                Iterator<String> it = Arrays.asList(slotString.split("\\-")).iterator();
                 int from = Integer.parseInt(it.next());
                 int to = Integer.parseInt(it.next());
 
                 for (int slot = from; slot <= to; slot++) {
-                    slots.add(slot);
+                    slots.set(slot);
 
                 }
                 continue;
             }
 
-            slots.add(Integer.parseInt(slotString));
+            slots.set(Integer.parseInt(slotString));
         }
 
-        return Collections.unmodifiableList(slots);
+        return slots;
     }
 
     private static long getLongFromIterator(Iterator<?> iterator, long defaultValue) {

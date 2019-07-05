@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 the original author or authors.
+ * Copyright 2017-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ public interface RedisSentinelCommands<K, V> {
     Map<K, V> master(K key);
 
     /**
-     * Provides a list of slaves for the master with the specified name.
+     * Provides a list of replicas for the master with the specified name.
      *
      * @param key the key
      * @return List&lt;Map&lt;K, V&gt;&gt;

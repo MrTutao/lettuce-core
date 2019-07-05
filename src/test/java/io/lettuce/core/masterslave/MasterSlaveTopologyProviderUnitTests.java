@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,8 +64,8 @@ class MasterSlaveTopologyProviderUnitTests {
         List<RedisNodeDescription> result = sut.getNodesFromInfo(info);
         assertThat(result).hasSize(2);
 
-        RedisNodeDescription slave = result.get(0);
-        assertThat(slave.getRole()).isEqualTo(RedisInstance.Role.SLAVE);
+        RedisNodeDescription replica = result.get(0);
+        assertThat(replica.getRole()).isEqualTo(RedisInstance.Role.SLAVE);
 
         RedisNodeDescription master = result.get(1);
         assertThat(master.getRole()).isEqualTo(RedisInstance.Role.MASTER);
@@ -81,8 +81,8 @@ class MasterSlaveTopologyProviderUnitTests {
         List<RedisNodeDescription> result = sut.getNodesFromInfo(info);
         assertThat(result).hasSize(2);
 
-        RedisNodeDescription slave = result.get(0);
-        assertThat(slave.getRole()).isEqualTo(RedisInstance.Role.SLAVE);
+        RedisNodeDescription replica = result.get(0);
+        assertThat(replica.getRole()).isEqualTo(RedisInstance.Role.SLAVE);
 
         RedisNodeDescription master = result.get(1);
         assertThat(master.getRole()).isEqualTo(RedisInstance.Role.MASTER);
@@ -99,8 +99,8 @@ class MasterSlaveTopologyProviderUnitTests {
         assertThat(result).hasSize(2);
 
 
-        RedisNodeDescription slave = result.get(0);
-        assertThat(slave.getRole()).isEqualTo(RedisInstance.Role.SLAVE);
+        RedisNodeDescription replica = result.get(0);
+        assertThat(replica.getRole()).isEqualTo(RedisInstance.Role.SLAVE);
 
         RedisNodeDescription master = result.get(1);
         assertThat(master.getRole()).isEqualTo(RedisInstance.Role.MASTER);

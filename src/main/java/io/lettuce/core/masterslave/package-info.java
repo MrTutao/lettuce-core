@@ -15,6 +15,7 @@
  *   connection.close();
  *   client.shutdown();
  * </pre>
+ * @deprecated will be moved to {@code masterreplica} package with version 6.
  */
 package io.lettuce.core.masterslave;
 

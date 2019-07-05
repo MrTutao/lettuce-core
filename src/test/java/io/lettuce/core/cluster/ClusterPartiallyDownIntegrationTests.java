@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ class ClusterPartiallyDownIntegrationTests extends TestSupport {
             fail("Missing RedisException");
         } catch (RedisException e) {
             assertThat(e).hasCauseInstanceOf(RedisConnectionException.class);
-            assertThat(e.getCause()).hasMessage("Unable to establish a connection to Redis Cluster");
+            assertThat(e.getCause()).hasMessageStartingWith("Unable to establish a connection to Redis Cluster");
         }
     }
 

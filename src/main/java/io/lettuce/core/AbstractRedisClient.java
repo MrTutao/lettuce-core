@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.concurrent.EventExecutorGroup;
 import io.netty.util.concurrent.Future;
-import io.netty.util.internal.ConcurrentSet;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -61,6 +60,7 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
  *
  * @author Mark Paluch
  * @author Jongyeol Choi
+ * @author Poorva Gokhale
  * @since 3.0
  * @see ClientResources
  */
@@ -71,7 +71,7 @@ public abstract class AbstractRedisClient {
 
     protected final Map<Class<? extends EventLoopGroup>, EventLoopGroup> eventLoopGroups = new ConcurrentHashMap<>(2);
     protected final ConnectionEvents connectionEvents = new ConnectionEvents();
-    protected final Set<Closeable> closeableResources = new ConcurrentSet<>();
+    protected final Set<Closeable> closeableResources = ConcurrentHashMap.newKeySet();
     protected final EventExecutorGroup genericWorkerPool;
     protected final HashedWheelTimer timer;
     protected final ChannelGroup channels;
@@ -434,56 +434,64 @@ public abstract class AbstractRedisClient {
         if (shutdown.compareAndSet(false, true)) {
 
             logger.debug("Initiate shutdown ({}, {}, {})", quietPeriod, timeout, timeUnit);
-
-            List<CompletableFuture<Void>> closeFutures = new ArrayList<>();
-
-            while (!closeableResources.isEmpty()) {
-                Closeable closeableResource = closeableResources.iterator().next();
-
-                if (closeableResource instanceof AsyncCloseable) {
-
-                    closeFutures.add(((AsyncCloseable) closeableResource).closeAsync());
-                } else {
-                    try {
-                        closeableResource.close();
-                    } catch (Exception e) {
-                        logger.debug("Exception on Close: " + e.getMessage(), e);
-                    }
-                }
-                closeableResources.remove(closeableResource);
-            }
-
-            for (Channel c : channels) {
-
-                ChannelPipeline pipeline = c.pipeline();
-
-                ConnectionWatchdog commandHandler = pipeline.get(ConnectionWatchdog.class);
-                if (commandHandler != null) {
-                    commandHandler.setListenOnChannelInactive(false);
-                }
-            }
-
-            try {
-                closeFutures.add(toCompletableFuture(channels.close()));
-            } catch (Exception e) {
-                logger.debug("Cannot close channels", e);
-            }
-
-            if (!sharedResources) {
-                Future<?> groupCloseFuture = clientResources.shutdown(quietPeriod, timeout, timeUnit);
-                closeFutures.add(toCompletableFuture(groupCloseFuture));
-            } else {
-                for (EventLoopGroup eventExecutors : eventLoopGroups.values()) {
-                    Future<?> groupCloseFuture = clientResources.eventLoopGroupProvider().release(eventExecutors, quietPeriod,
-                            timeout, timeUnit);
-                    closeFutures.add(toCompletableFuture(groupCloseFuture));
-                }
-            }
-
-            return Futures.allOf(closeFutures);
+            return closeResources().thenCompose((value) -> closeClientResources(quietPeriod, timeout, timeUnit));
         }
 
         return completedFuture(null);
+    }
+
+    private CompletableFuture<Void> closeResources() {
+
+        List<CompletableFuture<Void>> closeFutures = new ArrayList<>();
+
+        while (!closeableResources.isEmpty()) {
+            Closeable closeableResource = closeableResources.iterator().next();
+
+            if (closeableResource instanceof AsyncCloseable) {
+
+                closeFutures.add(((AsyncCloseable) closeableResource).closeAsync());
+            } else {
+                try {
+                    closeableResource.close();
+                } catch (Exception e) {
+                    logger.debug("Exception on Close: " + e.getMessage(), e);
+                }
+            }
+            closeableResources.remove(closeableResource);
+        }
+
+        for (Channel c : channels) {
+
+            ChannelPipeline pipeline = c.pipeline();
+
+            ConnectionWatchdog commandHandler = pipeline.get(ConnectionWatchdog.class);
+            if (commandHandler != null) {
+                commandHandler.setListenOnChannelInactive(false);
+            }
+        }
+
+        try {
+            closeFutures.add(toCompletableFuture(channels.close()));
+        } catch (Exception e) {
+            logger.debug("Cannot close channels", e);
+        }
+
+        return Futures.allOf(closeFutures);
+    }
+
+    private CompletableFuture<Void> closeClientResources(long quietPeriod, long timeout, TimeUnit timeUnit) {
+        List<CompletableFuture<Void>> groupCloseFutures = new ArrayList<>();
+        if (!sharedResources) {
+            Future<?> groupCloseFuture = clientResources.shutdown(quietPeriod, timeout, timeUnit);
+            groupCloseFutures.add(toCompletableFuture(groupCloseFuture));
+        } else {
+            for (EventLoopGroup eventExecutors : eventLoopGroups.values()) {
+                Future<?> groupCloseFuture = clientResources.eventLoopGroupProvider().release(eventExecutors, quietPeriod,
+                        timeout, timeUnit);
+                groupCloseFutures.add(toCompletableFuture(groupCloseFuture));
+            }
+        }
+        return Futures.allOf(groupCloseFutures);
     }
 
     protected int getResourceCount() {

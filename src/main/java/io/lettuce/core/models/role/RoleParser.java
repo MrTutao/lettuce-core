@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,14 +39,14 @@ public class RoleParser {
 
         ROLE_MAPPING = Collections.unmodifiableMap(roleMap);
 
-        Map<String, RedisSlaveInstance.State> slaveStateMap = new HashMap<>();
-        slaveStateMap.put("connect", RedisSlaveInstance.State.CONNECT);
-        slaveStateMap.put("connected", RedisSlaveInstance.State.CONNECTED);
-        slaveStateMap.put("connecting",
+        Map<String, RedisSlaveInstance.State> replicas = new HashMap<>();
+        replicas.put("connect", RedisSlaveInstance.State.CONNECT);
+        replicas.put("connected", RedisSlaveInstance.State.CONNECTED);
+        replicas.put("connecting",
             RedisSlaveInstance.State.CONNECTING);
-        slaveStateMap.put("sync", RedisSlaveInstance.State.SYNC);
+        replicas.put("sync", RedisSlaveInstance.State.SYNC);
 
-        SLAVE_STATE_MAPPING = Collections.unmodifiableMap(slaveStateMap);
+        SLAVE_STATE_MAPPING = Collections.unmodifiableMap(replicas);
     }
 
     /**
@@ -65,7 +65,7 @@ public class RoleParser {
     public static RedisInstance parse(List<?> roleOutput) {
         LettuceAssert.isTrue(roleOutput != null && !roleOutput.isEmpty(), "Empty role output");
         LettuceAssert.isTrue(roleOutput.get(0) instanceof String && ROLE_MAPPING.containsKey(roleOutput.get(0)),
-                "First role element must be a string (any of " + ROLE_MAPPING.keySet() + ")");
+                () -> "First role element must be a string (any of " + ROLE_MAPPING.keySet() + ")");
 
         RedisInstance.Role role = ROLE_MAPPING.get(roleOutput.get(0));
 
@@ -74,7 +74,7 @@ public class RoleParser {
                 return parseMaster(roleOutput);
 
             case SLAVE:
-                return parseSlave(roleOutput);
+                return parseReplica(roleOutput);
 
             case SENTINEL:
                 return parseSentinel(roleOutput);
@@ -87,14 +87,14 @@ public class RoleParser {
     private static RedisInstance parseMaster(List<?> roleOutput) {
 
         long replicationOffset = getMasterReplicationOffset(roleOutput);
-        List<ReplicationPartner> slaves = getMasterSlaveReplicationPartners(roleOutput);
+        List<ReplicationPartner> replicas = getMasterReplicaReplicationPartners(roleOutput);
 
         RedisMasterInstance redisMasterInstanceRole = new RedisMasterInstance(replicationOffset,
-                Collections.unmodifiableList(slaves));
+                Collections.unmodifiableList(replicas));
         return redisMasterInstanceRole;
     }
 
-    private static RedisInstance parseSlave(List<?> roleOutput) {
+    private static RedisInstance parseReplica(List<?> roleOutput) {
 
         Iterator<?> iterator = roleOutput.iterator();
         iterator.next(); // skip first element
@@ -146,25 +146,27 @@ public class RoleParser {
         return monitoredMasters;
     }
 
-    private static List<ReplicationPartner> getMasterSlaveReplicationPartners(List<?> roleOutput) {
-        List<ReplicationPartner> slaves = new ArrayList<>();
-        if (roleOutput.size() > 2 && roleOutput.get(2) instanceof Collection) {
-            Collection<?> slavesOutput = (Collection<?>) roleOutput.get(2);
+    private static List<ReplicationPartner> getMasterReplicaReplicationPartners(List<?> roleOutput) {
 
-            for (Object slaveOutput : slavesOutput) {
-                if (!(slaveOutput instanceof Collection<?>)) {
+        List<ReplicationPartner> replicas = new ArrayList<>();
+        if (roleOutput.size() > 2 && roleOutput.get(2) instanceof Collection) {
+            Collection<?> segments = (Collection<?>) roleOutput.get(2);
+
+            for (Object output : segments) {
+                if (!(output instanceof Collection<?>)) {
                     continue;
                 }
 
-                ReplicationPartner replicationPartner = getMasterSlaveReplicationPartner((Collection<?>) slaveOutput);
-                slaves.add(replicationPartner);
+                ReplicationPartner replicationPartner = getMasterSlaveReplicationPartner((Collection<?>) output);
+                replicas.add(replicationPartner);
             }
         }
-        return slaves;
+        return replicas;
     }
 
-    private static ReplicationPartner getMasterSlaveReplicationPartner(Collection<?> slaveOutput) {
-        Iterator<?> iterator = slaveOutput.iterator();
+    private static ReplicationPartner getMasterSlaveReplicationPartner(Collection<?> segments) {
+
+        Iterator<?> iterator = segments.iterator();
 
         String ip = getStringFromIterator(iterator, "");
         long port = getLongFromIterator(iterator, 0);

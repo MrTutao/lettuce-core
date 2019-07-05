@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,6 +128,16 @@ class RedisURIUnitTests {
 
         assertThat(redisURI.toURI().toString()).isEqualTo(
                 "redis-sentinel://auth@h1:222,h2,h3:1234?database=5&sentinelMasterId=masterId");
+    }
+
+    @Test
+    void sentinelSecureUriTest() {
+
+        RedisURI redisURI = RedisURI.create("rediss-sentinel://auth@h1:222,h2,h3:1234/5?sentinelMasterId=masterId");
+        assertThat(redisURI.isSsl()).isTrue();
+
+        assertThat(redisURI.toURI().toString()).isEqualTo(
+                "rediss-sentinel://auth@h1:222,h2,h3:1234?database=5&sentinelMasterId=masterId");
     }
 
     @Test

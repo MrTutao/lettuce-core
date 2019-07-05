@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -390,6 +390,18 @@ class RedisClusterClientIntegrationTests extends TestSupport {
         assertThat(new String(password)).isEqualTo("foobared");
 
         connection.close();
+        FastShutdown.shutdown(clusterClient);
+    }
+
+    @Test
+    void partitionRetrievalShouldFail() {
+
+        RedisClusterClient clusterClient = RedisClusterClient.create(TestClientResources.get(),
+                RedisURI.Builder.redis(TestSettings.host(), ClusterTestSettings.port7).build());
+
+        assertThatThrownBy(clusterClient::getPartitions).isInstanceOf(RedisException.class).hasRootCauseInstanceOf(
+                RedisCommandExecutionException.class);
+
         FastShutdown.shutdown(clusterClient);
     }
 

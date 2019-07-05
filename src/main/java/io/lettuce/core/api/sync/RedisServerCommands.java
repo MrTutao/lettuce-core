@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 the original author or authors.
+ * Copyright 2017-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -176,6 +176,7 @@ public interface RedisServerCommands<K, V> {
 
     /**
      * Crash and recover
+     *
      * @param delay optional delay in milliseconds
      * @return String simple-string-reply
      */
@@ -220,6 +221,7 @@ public interface RedisServerCommands<K, V> {
 
     /**
      * Restart the server gracefully.
+     *
      * @param delay optional delay in milliseconds
      * @return String simple-string-reply
      */
@@ -284,6 +286,14 @@ public interface RedisServerCommands<K, V> {
     Date lastsave();
 
     /**
+     * Reports the number of bytes that a key and its value require to be stored in RAM.
+     *
+     * @return memory usage in bytes.
+     * @since 5.2
+     */
+    Long memoryUsage(K key);
+
+    /**
      * Synchronously save the dataset to disk.
      *
      * @return String simple-string-reply The commands returns OK on success.
@@ -298,7 +308,7 @@ public interface RedisServerCommands<K, V> {
     void shutdown(boolean save);
 
     /**
-     * Make the server a slave of another instance, or promote it as master.
+     * Make the server a replica of another instance, or promote it as master.
      *
      * @param host the host type: string
      * @param port the port type: string

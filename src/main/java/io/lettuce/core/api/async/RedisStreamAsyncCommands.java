@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,6 +158,34 @@ public interface RedisStreamAsyncCommands<K, V> {
      * @return simple-reply OK
      */
     RedisFuture<String> xgroupSetid(StreamOffset<K> streamOffset, K group);
+
+    /**
+     * Retrieve information about the stream at {@code key}.
+     *
+     * @param key the stream key.
+     * @return List&lt;Object&gt; array-reply.
+     * @since 5.2
+     */
+    RedisFuture<List<Object>> xinfoStream(K key);
+
+    /**
+     * Retrieve information about the stream consumer groups at {@code key}.
+     *
+     * @param key the stream key.
+     * @return List&lt;Object&gt; array-reply.
+     * @since 5.2
+     */
+    RedisFuture<List<Object>> xinfoGroups(K key);
+
+    /**
+     * Retrieve information about consumer groups of group {@code group} and stream at {@code key}.
+     *
+     * @param key the stream key.
+     * @param group name of the consumer group.
+     * @return List&lt;Object&gt; array-reply.
+     * @since 5.2
+     */
+    RedisFuture<List<Object>> xinfoConsumers(K key, K group);
 
     /**
      * Get the length of a steam.

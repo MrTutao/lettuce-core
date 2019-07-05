@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -232,6 +232,38 @@ public class StreamCommandIntegrationTests extends TestSupport {
         assertThat(secondMessage.getId()).isEqualTo(message2);
         assertThat(secondMessage.getStream()).isEqualTo("stream-2");
         assertThat(secondMessage.getBody()).containsEntry("key4", "value4");
+    }
+
+    @Test
+    void xinfoStream() {
+
+        redis.xadd(key, Collections.singletonMap("key1", "value1"));
+
+        List<Object> objects = redis.xinfoStream(key);
+
+        assertThat(objects).containsSequence("length", 1L);
+    }
+
+    @Test
+    void xinfoGroups() {
+
+        assertThat(redis.xgroupCreate(StreamOffset.latest(key), "group", XGroupCreateArgs.Builder.mkstream())).isEqualTo("OK");
+
+        List<Object> objects = redis.xinfoGroups(key);
+        assertThat((List<Object>) objects.get(0)).containsSequence("name", "group");
+    }
+
+    @Test
+    void xinfoConsumers() {
+
+        assertThat(redis.xgroupCreate(StreamOffset.from(key, "0-0"), "group", XGroupCreateArgs.Builder.mkstream())).isEqualTo(
+                "OK");
+        redis.xadd(key, Collections.singletonMap("key1", "value1"));
+
+        redis.xreadgroup(Consumer.from("group", "consumer1"), StreamOffset.lastConsumed(key));
+
+        List<Object> objects = redis.xinfoConsumers(key, "group");
+        assertThat((List<Object>) objects.get(0)).containsSequence("name", "consumer1");
     }
 
     @Test

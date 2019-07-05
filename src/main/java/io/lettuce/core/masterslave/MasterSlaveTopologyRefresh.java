@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ class MasterSlaveTopologyRefresh {
     }
 
     /**
-     * Load master slave nodes. Result contains an ordered list of {@link RedisNodeDescription}s. The sort key is the latency.
+     * Load master replica nodes. Result contains an ordered list of {@link RedisNodeDescription}s. The sort key is the latency.
      * Nodes with lower latency come first.
      *
      * @param seed collection of {@link RedisURI}s

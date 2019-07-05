@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,9 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
  *
  * @author Mark Paluch
  * @author Adam McElwee
+ * @deprecated will be moved to {@code masterreplica} package with version 6.
  */
+@Deprecated
 public class StaticMasterSlaveTopologyProvider implements TopologyProvider {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(StaticMasterSlaveTopologyProvider.class);
@@ -85,7 +87,7 @@ public class StaticMasterSlaveTopologyProvider implements TopologyProvider {
 
                             if (nodeDescriptions.isEmpty()) {
                                 return Mono.error(new RedisConnectionException(String.format(
-                                        "Failed to connect to at leas one node in %s", redisURIs)));
+                                        "Failed to connect to at least one node in %s", redisURIs)));
                             }
 
                             return Mono.just(nodeDescriptions);

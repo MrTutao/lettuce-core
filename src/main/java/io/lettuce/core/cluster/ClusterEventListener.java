@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,17 @@ interface ClusterEventListener {
     }
 
     /**
+     * Event callback if a command should be routed to a slot that is not covered.
+     *
+     * @since 5.2
+     */
+    default void onUncoveredSlot(int slot) {
+    }
+
+    /**
      * Event callback if a connection is attempted to an unknown node.
+     *
+     * @since 5.1
      */
     default void onUnknownNode() {
     }

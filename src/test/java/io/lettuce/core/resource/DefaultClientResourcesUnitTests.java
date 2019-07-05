@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import reactor.test.StepVerifier;
 import io.lettuce.core.event.Event;
@@ -34,6 +35,7 @@ import io.lettuce.core.metrics.DefaultCommandLatencyCollectorOptions;
 import io.lettuce.test.Futures;
 import io.lettuce.test.resource.FastShutdown;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timer;
 import io.netty.util.concurrent.EventExecutorGroup;
 import io.netty.util.concurrent.Future;
@@ -77,7 +79,7 @@ class DefaultClientResourcesUnitTests {
         EventExecutorGroup eventExecutors = sut.eventExecutorGroup();
         NioEventLoopGroup eventLoopGroup = sut.eventLoopGroupProvider().allocate(NioEventLoopGroup.class);
 
-        assertThat(eventExecutors.iterator()).hasSize(4);
+        assertThat(eventExecutors).hasSize(4);
         assertThat(eventLoopGroup.executorCount()).isEqualTo(4);
         assertThat(sut.ioThreadPoolSize()).isEqualTo(4);
         assertThat(sut.commandLatencyCollector()).isNotNull();
@@ -162,7 +164,7 @@ class DefaultClientResourcesUnitTests {
         EventExecutorGroup eventExecutors = sut.eventExecutorGroup();
         NioEventLoopGroup eventLoopGroup = sut.eventLoopGroupProvider().allocate(NioEventLoopGroup.class);
 
-        assertThat(eventExecutors.iterator()).hasSize(3);
+        assertThat(eventExecutors).hasSize(3);
         assertThat(eventLoopGroup.executorCount()).isEqualTo(3);
         assertThat(sut.ioThreadPoolSize()).isEqualTo(3);
 
@@ -213,5 +215,42 @@ class DefaultClientResourcesUnitTests {
         assertThat(delay1).isSameAs(delay2);
 
         FastShutdown.shutdown(resources);
+    }
+
+    @Test
+    void considersSharedStateFromMutation() {
+
+        ClientResources clientResources = ClientResources.create();
+        HashedWheelTimer timer = (HashedWheelTimer) clientResources.timer();
+
+        assertThat(ReflectionTestUtils.getField(timer, "workerState")).isEqualTo(0);
+
+        ClientResources copy = clientResources.mutate().build();
+        assertThat(copy.timer()).isSameAs(timer);
+
+        copy.shutdown().awaitUninterruptibly();
+
+        assertThat(ReflectionTestUtils.getField(timer, "workerState")).isEqualTo(2);
+    }
+
+    @Test
+    void considersDecoupledSharedStateFromMutation() {
+
+        ClientResources clientResources = ClientResources.create();
+        HashedWheelTimer timer = (HashedWheelTimer) clientResources.timer();
+
+        assertThat(ReflectionTestUtils.getField(timer, "workerState")).isEqualTo(0);
+
+        ClientResources copy = clientResources.mutate().timer(new HashedWheelTimer()).build();
+        HashedWheelTimer copyTimer = (HashedWheelTimer) copy.timer();
+        assertThat(copy.timer()).isNotSameAs(timer);
+
+        copy.shutdown().awaitUninterruptibly();
+
+        assertThat(ReflectionTestUtils.getField(timer, "workerState")).isEqualTo(0);
+        assertThat(ReflectionTestUtils.getField(copyTimer, "workerState")).isEqualTo(0);
+
+        copyTimer.stop();
+        timer.stop();
     }
 }

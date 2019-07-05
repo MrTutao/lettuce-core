@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,11 +86,11 @@ class ClusterSetup {
 
     /**
      * Setup a cluster consisting of two members (see {@link ClusterTestSettings#port5} to {@link ClusterTestSettings#port6}).
-     * One master (0-16383) and one slave.
+     * One master (0-16383) and one replica.
      *
      * @param clusterRule
      */
-    public static void setupMasterWithSlave(ClusterRule clusterRule) {
+    public static void setupMasterWithReplica(ClusterRule clusterRule) {
 
         clusterRule.clusterReset();
         clusterRule.meet(ClusterTestSettings.host, ClusterTestSettings.port5);
@@ -132,17 +132,6 @@ class ClusterSetup {
 
     private static Stream<RedisClusterNode> partitionStream(ClusterRule clusterRule) {
         return clusterRule.getClusterClient().getPartitions().getPartitions().stream();
-    }
-
-    private static boolean is2Masters2Slaves(ClusterRule clusterRule) {
-        RedisClusterClient clusterClient = clusterRule.getClusterClient();
-
-        long slaves = clusterClient.getPartitions().stream()
-                .filter(redisClusterNode -> redisClusterNode.is(RedisClusterNode.NodeFlag.SLAVE)).count();
-        long masters = clusterClient.getPartitions().stream()
-                .filter(redisClusterNode -> redisClusterNode.is(RedisClusterNode.NodeFlag.MASTER)).count();
-
-        return slaves == 2 && masters == 2;
     }
 
 }

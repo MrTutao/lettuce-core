@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ import io.netty.util.concurrent.ImmediateEventExecutor;
  * @param <K> Key type.
  * @param <V> Value type.
  * @author Mark Paluch
+ * @author Nikolai Perevozchikov
  * @since 4.0
  */
 public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashReactiveCommands<K, V>,
@@ -402,10 +403,11 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
         if (tracingEnabled) {
 
             return withTraceContext().flatMapMany(
-                    it -> Flux.from(new RedisPublisher<>(decorate(commandSupplier, it), connection, dissolve, getScheduler())));
+                    it -> Flux.from(new RedisPublisher<>(decorate(commandSupplier, it), connection, dissolve, getScheduler()
+                            .next())));
         }
 
-        return Flux.from(new RedisPublisher<>(commandSupplier, connection, dissolve, getScheduler()));
+        return Flux.from(new RedisPublisher<>(commandSupplier, connection, dissolve, getScheduler().next()));
     }
 
     private Mono<TraceContext> withTraceContext() {
@@ -953,6 +955,11 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     @Override
     public Mono<String> ltrim(K key, long start, long stop) {
         return createMono(() -> commandBuilder.ltrim(key, start, stop));
+    }
+
+    @Override
+    public Mono<Long> memoryUsage(K key) {
+        return createMono(() -> commandBuilder.memoryUsage(key));
     }
 
     @Override
@@ -1617,6 +1624,21 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     @Override
     public Mono<String> xgroupSetid(XReadArgs.StreamOffset<K> streamOffset, K group) {
         return createMono(() -> commandBuilder.xgroupSetid(streamOffset, group));
+    }
+
+    @Override
+    public Flux<Object> xinfoStream(K key) {
+        return createDissolvingFlux(() -> commandBuilder.xinfoStream(key));
+    }
+
+    @Override
+    public Flux<Object> xinfoGroups(K key) {
+        return createDissolvingFlux(() -> commandBuilder.xinfoGroups(key));
+    }
+
+    @Override
+    public Flux<Object> xinfoConsumers(K key, K group) {
+        return createDissolvingFlux(() -> commandBuilder.xinfoConsumers(key, group));
     }
 
     @Override

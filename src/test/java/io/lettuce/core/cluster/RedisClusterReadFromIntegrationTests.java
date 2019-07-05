@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,9 +81,9 @@ class RedisClusterReadFromIntegrationTests extends TestSupport {
     }
 
     @Test
-    void readWriteSlave() {
+    void readWriteReplica() {
 
-        connection.setReadFrom(ReadFrom.SLAVE);
+        connection.setReadFrom(ReadFrom.REPLICA);
 
         sync.set(key, "value1");
 
@@ -92,9 +92,9 @@ class RedisClusterReadFromIntegrationTests extends TestSupport {
     }
 
     @Test
-    void readWriteSlavePreferred() {
+    void readWriteReplicaPreferred() {
 
-        connection.setReadFrom(ReadFrom.SLAVE_PREFERRED);
+        connection.setReadFrom(ReadFrom.REPLICA_PREFERRED);
 
         sync.set(key, "value1");
 

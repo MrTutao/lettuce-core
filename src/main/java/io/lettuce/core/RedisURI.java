@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 the original author or authors.
+ * Copyright 2011-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import io.lettuce.core.protocol.LettuceCharsets;
  * Redis URI. Contains connection details for the Redis/Sentinel connections. You can provide the database, client name,
  * password and timeouts within the RedisURI.
  *
- * You have following possibilities to create a {@link RedisURI}:
+ * You have the following possibilities to create a {@link RedisURI}:
  *
  * <ul>
  * <li>Use an URI:
@@ -91,6 +91,7 @@ import io.lettuce.core.protocol.LettuceCharsets;
  * <li><b>rediss</b> Redis Standalone SSL</li>
  * <li><b>redis-socket</b> Redis Standalone Unix Domain Socket</li>
  * <li><b>redis-sentinel</b> Redis Sentinel</li>
+ * <li><b>rediss-sentinel</b> Redis Sentinel SSL</li>
  * </ul>
  *
  * <p>
@@ -119,6 +120,7 @@ import io.lettuce.core.protocol.LettuceCharsets;
 public class RedisURI implements Serializable, ConnectionPoint {
 
     public static final String URI_SCHEME_REDIS_SENTINEL = "redis-sentinel";
+    public static final String URI_SCHEME_REDIS_SENTINEL_SECURE = "rediss-sentinel";
     public static final String URI_SCHEME_REDIS = "redis";
     public static final String URI_SCHEME_REDIS_SECURE = "rediss";
     public static final String URI_SCHEME_REDIS_SECURE_ALT = "redis+ssl";
@@ -349,9 +351,19 @@ public class RedisURI implements Serializable, ConnectionPoint {
      * @param password the password, must not be {@literal null}.
      */
     public void setPassword(String password) {
+        setPassword((CharSequence) password);
+    }
+
+    /**
+     * Sets the password. Use empty string to skip authentication.
+     *
+     * @param password the password, must not be {@literal null}.
+     * @since 5.2
+     */
+    public void setPassword(CharSequence password) {
 
         LettuceAssert.notNull(password, "Password must not be null");
-        this.password = password.toCharArray();
+        this.password = password.toString().toCharArray();
     }
 
     /**
@@ -441,12 +453,13 @@ public class RedisURI implements Serializable, ConnectionPoint {
     }
 
     /**
-     * Sets whether to use SSL model.
+     * Sets whether to use SSL. Sets SSL also for already configured Redis Sentinel nodes.
      *
      * @param ssl
      */
     public void setSsl(boolean ssl) {
         this.ssl = ssl;
+        this.sentinels.forEach(it -> it.setSsl(ssl));
     }
 
     /**
@@ -459,12 +472,14 @@ public class RedisURI implements Serializable, ConnectionPoint {
     }
 
     /**
-     * Sets whether to verify peers when using {@link #isSsl() SSL}.
+     * Sets whether to verify peers when using {@link #isSsl() SSL}. Sets peer verification also for already configured Redis
+     * Sentinel nodes.
      *
      * @param verifyPeer {@literal true} to verify peers when using {@link #isSsl() SSL}.
      */
     public void setVerifyPeer(boolean verifyPeer) {
         this.verifyPeer = verifyPeer;
+        this.sentinels.forEach(it -> it.setVerifyPeer(verifyPeer));
     }
 
     /**
@@ -477,12 +492,13 @@ public class RedisURI implements Serializable, ConnectionPoint {
     }
 
     /**
-     * Returns whether StartTLS is enabled.
+     * Returns whether StartTLS is enabled. Sets StartTLS also for already configured Redis Sentinel nodes.
      *
      * @param startTls {@literal true} if StartTLS is enabled.
      */
     public void setStartTls(boolean startTls) {
         this.startTls = startTls;
+        this.sentinels.forEach(it -> it.setStartTls(startTls));
     }
 
     /**
@@ -517,7 +533,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
         LettuceAssert.notNull(uri.getScheme(), "URI scheme must not be null");
 
         Builder builder;
-        if (uri.getScheme().equals(URI_SCHEME_REDIS_SENTINEL)) {
+        if (isSentinel(uri.getScheme())) {
             builder = configureSentinel(uri);
         } else {
             builder = configureStandalone(uri);
@@ -577,7 +593,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
             }
         }
 
-        if (uri.getScheme().equals(URI_SCHEME_REDIS_SENTINEL)) {
+        if (isSentinel(uri.getScheme())) {
             LettuceAssert.notEmpty(builder.sentinelMasterId, "URI must contain the sentinelMasterId");
         }
 
@@ -643,7 +659,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
 
     private String getPortPart(int port, String scheme) {
 
-        if (URI_SCHEME_REDIS_SENTINEL.equals(scheme) && port == DEFAULT_SENTINEL_PORT) {
+        if (isSentinel(scheme) && port == DEFAULT_SENTINEL_PORT) {
             return "";
         }
 
@@ -670,7 +686,11 @@ public class RedisURI implements Serializable, ConnectionPoint {
         }
 
         if (host == null && !sentinels.isEmpty()) {
-            scheme = URI_SCHEME_REDIS_SENTINEL;
+            if (isSsl()) {
+                scheme = URI_SCHEME_REDIS_SENTINEL_SECURE;
+            } else {
+                scheme = URI_SCHEME_REDIS_SENTINEL;
+            }
         }
         return scheme;
     }
@@ -942,8 +962,16 @@ public class RedisURI implements Serializable, ConnectionPoint {
             builder.withSentinelMasterId(masterId);
         }
 
+        if (uri.getScheme().equals(URI_SCHEME_REDIS_SENTINEL_SECURE)) {
+            builder.withSsl(true);
+        }
+
         LettuceAssert.notNull(builder, "Invalid URI, cannot get host part");
         return builder;
+    }
+
+    private static boolean isSentinel(String scheme) {
+        return URI_SCHEME_REDIS_SENTINEL.equals(scheme) || URI_SCHEME_REDIS_SENTINEL_SECURE.equals(scheme);
     }
 
     /**
@@ -958,11 +986,12 @@ public class RedisURI implements Serializable, ConnectionPoint {
         private int database;
         private String clientName;
         private char[] password;
+        private char[] sentinelPassword;
         private boolean ssl = false;
         private boolean verifyPeer = true;
         private boolean startTls = false;
         private Duration timeout = DEFAULT_TIMEOUT_DURATION;
-        private final List<HostAndPort> sentinels = new ArrayList<>();
+        private final List<RedisURI> sentinels = new ArrayList<>();
 
         private Builder() {
         }
@@ -971,7 +1000,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
          * Set Redis socket. Creates a new builder.
          *
          * @param socket the host name
-         * @return New builder with Redis socket.
+         * @return new builder with Redis socket.
          */
         public static Builder socket(String socket) {
 
@@ -986,7 +1015,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
          * Set Redis host. Creates a new builder.
          *
          * @param host the host name
-         * @return New builder with Redis host/port.
+         * @return new builder with Redis host/port.
          */
         public static Builder redis(String host) {
             return redis(host, DEFAULT_REDIS_PORT);
@@ -997,12 +1026,12 @@ public class RedisURI implements Serializable, ConnectionPoint {
          *
          * @param host the host name
          * @param port the port
-         * @return New builder with Redis host/port.
+         * @return new builder with Redis host/port.
          */
         public static Builder redis(String host, int port) {
 
             LettuceAssert.notEmpty(host, "Host must not be empty");
-            LettuceAssert.isTrue(isValidPort(port), String.format("Port out of range: %s", port));
+            LettuceAssert.isTrue(isValidPort(port), () -> String.format("Port out of range: %s", port));
 
             Builder builder = RedisURI.builder();
             return builder.withHost(host).withPort(port);
@@ -1012,7 +1041,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
          * Set Sentinel host. Creates a new builder.
          *
          * @param host the host name
-         * @return New builder with Sentinel host/port.
+         * @return new builder with Sentinel host/port.
          */
         public static Builder sentinel(String host) {
 
@@ -1027,12 +1056,12 @@ public class RedisURI implements Serializable, ConnectionPoint {
          *
          * @param host the host name
          * @param port the port
-         * @return New builder with Sentinel host/port.
+         * @return new builder with Sentinel host/port.
          */
         public static Builder sentinel(String host, int port) {
 
             LettuceAssert.notEmpty(host, "Host must not be empty");
-            LettuceAssert.isTrue(isValidPort(port), String.format("Port out of range: %s", port));
+            LettuceAssert.isTrue(isValidPort(port), () -> String.format("Port out of range: %s", port));
 
             Builder builder = RedisURI.builder();
             return builder.withSentinel(host, port);
@@ -1043,7 +1072,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
          *
          * @param host the host name
          * @param masterId sentinel master id
-         * @return New builder with Sentinel host/port.
+         * @return new builder with Sentinel host/port.
          */
         public static Builder sentinel(String host, String masterId) {
             return sentinel(host, DEFAULT_SENTINEL_PORT, masterId);
@@ -1055,14 +1084,30 @@ public class RedisURI implements Serializable, ConnectionPoint {
          * @param host the host name
          * @param port the port
          * @param masterId sentinel master id
-         * @return New builder with Sentinel host/port.
+         * @return new builder with Sentinel host/port.
          */
         public static Builder sentinel(String host, int port, String masterId) {
+            return sentinel(host, port, masterId, null);
+        }
+
+        /**
+         * Set Sentinel host, port, master id and Sentinel authentication. Creates a new builder.
+         *
+         * @param host the host name
+         * @param port the port
+         * @param masterId sentinel master id
+         * @param password the Sentinel password (supported since Redis 5.0.1)
+         * @return new builder with Sentinel host/port.
+         */
+        public static Builder sentinel(String host, int port, String masterId, CharSequence password) {
 
             LettuceAssert.notEmpty(host, "Host must not be empty");
-            LettuceAssert.isTrue(isValidPort(port), String.format("Port out of range: %s", port));
+            LettuceAssert.isTrue(isValidPort(port), () -> String.format("Port out of range: %s", port));
 
             Builder builder = RedisURI.builder();
+            if (password != null) {
+                builder.sentinelPassword = password.toString().toCharArray();
+            }
             return builder.withSentinelMasterId(masterId).withSentinel(host, port);
         }
 
@@ -1085,11 +1130,49 @@ public class RedisURI implements Serializable, ConnectionPoint {
          */
         public Builder withSentinel(String host, int port) {
 
+            if (this.sentinelPassword != null) {
+                return withSentinel(host, port, new String(this.sentinelPassword));
+            }
+
+            return withSentinel(host, port, null);
+        }
+
+        /**
+         * Add a withSentinel host/port and Sentinel authentication to the existing builder.
+         *
+         * @param host the host name
+         * @param port the port
+         * @param password the Sentinel password (supported since Redis 5.0.1)
+         * @return the builder
+         * @since 5.2
+         */
+        public Builder withSentinel(String host, int port, CharSequence password) {
+
             LettuceAssert.assertState(this.host == null, "Cannot use with Redis mode.");
             LettuceAssert.notEmpty(host, "Host must not be empty");
-            LettuceAssert.isTrue(isValidPort(port), String.format("Port out of range: %s", port));
+            LettuceAssert.isTrue(isValidPort(port), () -> String.format("Port out of range: %s", port));
 
-            sentinels.add(HostAndPort.of(host, port));
+            RedisURI redisURI = RedisURI.create(host, port);
+
+            if (password != null) {
+                redisURI.setPassword(password.toString());
+            }
+
+            return withSentinel(redisURI);
+        }
+
+        /**
+         * Add a withSentinel RedisURI to the existing builder.
+         *
+         * @param redisURI the sentinel URI
+         * @return the builder
+         * @since 5.2
+         */
+        public Builder withSentinel(RedisURI redisURI) {
+
+            LettuceAssert.notNull(redisURI, "Redis URI must not be null");
+
+            sentinels.add(redisURI);
             return this;
         }
 
@@ -1117,51 +1200,48 @@ public class RedisURI implements Serializable, ConnectionPoint {
         public Builder withPort(int port) {
 
             LettuceAssert.assertState(this.host != null, "Host is null. Cannot use in Sentinel mode.");
-            LettuceAssert.isTrue(isValidPort(port), String.format("Port out of range: %s", port));
+            LettuceAssert.isTrue(isValidPort(port), () -> String.format("Port out of range: %s", port));
 
             this.port = port;
             return this;
         }
 
         /**
-         * Adds ssl information to the builder. Does only affect Redis URI, cannot be used with Sentinel connections.
+         * Adds ssl information to the builder. Sets SSL also for already configured Redis Sentinel nodes.
          *
          * @param ssl {@literal true} if use SSL
          * @return the builder
          */
         public Builder withSsl(boolean ssl) {
 
-            LettuceAssert.assertState(this.host != null, "Host is null. Cannot use in Sentinel mode.");
-
             this.ssl = ssl;
+            this.sentinels.forEach(it -> it.setSsl(ssl));
             return this;
         }
 
         /**
-         * Enables/disables StartTLS when using SSL. Does only affect Redis URI, cannot be used with Sentinel connections.
+         * Enables/disables StartTLS when using SSL. Sets StartTLS also for already configured Redis Sentinel nodes.
          *
          * @param startTls {@literal true} if use StartTLS
          * @return the builder
          */
         public Builder withStartTls(boolean startTls) {
 
-            LettuceAssert.assertState(this.host != null, "Host is null. Cannot use in Sentinel mode.");
-
             this.startTls = startTls;
+            this.sentinels.forEach(it -> it.setStartTls(startTls));
             return this;
         }
 
         /**
-         * Enables/disables peer verification. Does only affect Redis URI, cannot be used with Sentinel connections.
+         * Enables/disables peer verification. Sets peer verification also for already configured Redis Sentinel nodes.
          *
          * @param verifyPeer {@literal true} to verify hosts when using SSL
          * @return the builder
          */
         public Builder withVerifyPeer(boolean verifyPeer) {
 
-            LettuceAssert.assertState(this.host != null, "Host is null. Cannot use in Sentinel mode.");
-
             this.verifyPeer = verifyPeer;
+            this.sentinels.forEach(it -> it.setVerifyPeer(verifyPeer));
             return this;
         }
 
@@ -1173,7 +1253,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
          */
         public Builder withDatabase(int database) {
 
-            LettuceAssert.isTrue(database >= 0, "Invalid database number: " + database);
+            LettuceAssert.isTrue(database >= 0, () -> "Invalid database number: " + database);
 
             this.database = database;
             return this;
@@ -1290,8 +1370,10 @@ public class RedisURI implements Serializable, ConnectionPoint {
 
             redisURI.setSentinelMasterId(sentinelMasterId);
 
-            for (HostAndPort sentinel : sentinels) {
-                redisURI.getSentinels().add(new RedisURI(sentinel.getHostText(), sentinel.getPort(), timeout));
+            for (RedisURI sentinel : sentinels) {
+
+                sentinel.setTimeout(timeout);
+                redisURI.getSentinels().add(sentinel);
             }
 
             redisURI.setSocket(socket);
