@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,6 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
 
-import io.lettuce.core.protocol.LettuceCharsets;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -74,13 +73,13 @@ public class StringCodecBenchmark {
     public static class Input {
 
         Blackhole blackhole;
-        StringCodec asciiCodec = new StringCodec(LettuceCharsets.ASCII);
-        StringCodec utf8Codec = new StringCodec(LettuceCharsets.UTF8);
+        StringCodec asciiCodec = new StringCodec(StandardCharsets.US_ASCII);
+        StringCodec utf8Codec = new StringCodec(StandardCharsets.UTF_8);
         StringCodec isoCodec = new StringCodec(StandardCharsets.ISO_8859_1);
 
         String teststring = "hello üäü~∑†®†ª€∂‚¶¢ Wørld";
         String teststringPlain = "hello uufadsfasdfadssdfadfs";
-        ByteBuffer input = ByteBuffer.wrap(teststring.getBytes(LettuceCharsets.UTF8));
+        ByteBuffer input = ByteBuffer.wrap(teststring.getBytes(StandardCharsets.UTF_8));
 
         ByteBuf byteBuf = Unpooled.buffer(512);
 

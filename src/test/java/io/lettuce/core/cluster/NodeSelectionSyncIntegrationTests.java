@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,8 @@ import static io.lettuce.core.ScriptOutputType.STATUS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Fail.fail;
 
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 
@@ -87,15 +87,15 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
         assertThat(commands.slaves().size()).isEqualTo(2);
         assertThat(commands.masters().size()).isEqualTo(2);
 
-        assertThat(commands.nodes(redisClusterNode -> redisClusterNode.is(RedisClusterNode.NodeFlag.MYSELF)).size()).isEqualTo(
-                1);
+        assertThat(commands.nodes(redisClusterNode -> redisClusterNode.is(RedisClusterNode.NodeFlag.MYSELF)).size())
+                .isEqualTo(1);
     }
 
     @Test
     void testNodeSelection() {
 
-        NodeSelection<String, String> onlyMe = commands.nodes(redisClusterNode -> redisClusterNode.getFlags().contains(
-                RedisClusterNode.NodeFlag.MYSELF));
+        NodeSelection<String, String> onlyMe = commands
+                .nodes(redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.MYSELF));
         Map<RedisClusterNode, RedisCommands<String, String>> map = onlyMe.asMap();
 
         assertThat(map).hasSize(1);
@@ -113,10 +113,11 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
     void testDynamicNodeSelection() {
 
         Partitions partitions = commands.getStatefulConnection().getPartitions();
-        partitions.forEach(redisClusterNode -> redisClusterNode.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.MASTER)));
+        partitions.forEach(
+                redisClusterNode -> redisClusterNode.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.MASTER)));
 
-        NodeSelection<String, String> selection = commands.nodes(
-                redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.MYSELF), true);
+        NodeSelection<String, String> selection = commands
+                .nodes(redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.MYSELF), true);
 
         assertThat(selection.asMap()).hasSize(0);
         partitions.getPartition(0)
@@ -133,8 +134,8 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
     @Test
     void testNodeSelectionPing() {
 
-        NodeSelection<String, String> onlyMe = commands.nodes(redisClusterNode -> redisClusterNode.getFlags().contains(
-                RedisClusterNode.NodeFlag.MYSELF));
+        NodeSelection<String, String> onlyMe = commands
+                .nodes(redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.MYSELF));
         Map<RedisClusterNode, RedisCommands<String, String>> map = onlyMe.asMap();
 
         assertThat(map).hasSize(1);
@@ -147,8 +148,8 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
     @Test
     void testStaticNodeSelection() {
 
-        NodeSelection<String, String> selection = commands.nodes(
-                redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.MYSELF), false);
+        NodeSelection<String, String> selection = commands
+                .nodes(redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.MYSELF), false);
 
         assertThat(selection.asMap()).hasSize(1);
 
@@ -165,7 +166,7 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
 
         RedisAdvancedClusterCommands<String, String> connection2 = clusterClient.connect().sync();
 
-        connection2.setTimeout(1, TimeUnit.SECONDS);
+        connection2.setTimeout(Duration.ofSeconds(1));
         NodeSelection<String, String> masters = connection2.masters();
         masters.commands().configSet("lua-time-limit", "10");
 
@@ -183,8 +184,8 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
     @Test
     void testReplicasReadWrite() {
 
-        NodeSelection<String, String> nodes = commands.nodes(redisClusterNode -> redisClusterNode.getFlags().contains(
-                RedisClusterNode.NodeFlag.SLAVE));
+        NodeSelection<String, String> nodes = commands
+                .nodes(redisClusterNode -> redisClusterNode.getFlags().contains(RedisClusterNode.NodeFlag.SLAVE));
 
         assertThat(nodes.size()).isEqualTo(2);
 
@@ -196,7 +197,11 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
             nodes.commands().get(key);
             fail("Missing RedisCommandExecutionException: MOVED");
         } catch (RedisCommandExecutionException e) {
-            assertThat(e.getSuppressed().length).isGreaterThan(0);
+            if (e.getMessage().startsWith("MOVED")) {
+                assertThat(e.getSuppressed()).isEmpty();
+            } else {
+                assertThat(e.getSuppressed()).isNotEmpty();
+            }
         }
     }
 
@@ -207,8 +212,9 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
         Optional<RedisClusterNode> master = clusterClient.getPartitions().getPartitions().stream()
                 .filter(redisClusterNode -> redisClusterNode.hasSlot(slot)).findFirst();
 
-        NodeSelection<String, String> nodes = commands.slaves(redisClusterNode -> redisClusterNode
-                .is(RedisClusterNode.NodeFlag.SLAVE) && redisClusterNode.getSlaveOf().equals(master.get().getNodeId()));
+        NodeSelection<String, String> nodes = commands
+                .slaves(redisClusterNode -> redisClusterNode.is(RedisClusterNode.NodeFlag.SLAVE)
+                        && redisClusterNode.getSlaveOf().equals(master.get().getNodeId()));
 
         assertThat(nodes.size()).isEqualTo(1);
 
@@ -223,8 +229,7 @@ class NodeSelectionSyncIntegrationTests extends TestSupport {
         waitForReplication(commands, key, port);
     }
 
-    static void waitForReplication(RedisAdvancedClusterCommands<String, String> commands, String key, int port)
- {
+    static void waitForReplication(RedisAdvancedClusterCommands<String, String> commands, String key, int port) {
 
         NodeSelection<String, String> selection = commands
                 .slaves(redisClusterNode -> redisClusterNode.getUri().getPort() == port);

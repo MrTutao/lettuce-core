@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2019 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,11 +50,13 @@ class ScanIteratorIntegrationTests extends TestSupport {
     ScanIteratorIntegrationTests(StatefulRedisClusterConnection<String, String> connection) {
         this.connection = connection;
         this.redis = connection.sync();
+        this.connection.sync().flushall();
     }
 
     @BeforeEach
     void setUp() {
         this.redis.flushall();
+        this.connection.setReadFrom(ReadFrom.MASTER);
     }
 
     @Test
@@ -95,6 +97,19 @@ class ScanIteratorIntegrationTests extends TestSupport {
     void keysMultiPass() {
 
         redis.mset(KeysAndValues.MAP);
+
+        ScanIterator<String> scan = ScanIterator.scan(redis);
+
+        List<String> keys = scan.stream().collect(Collectors.toList());
+
+        assertThat(keys).containsAll(KeysAndValues.KEYS);
+    }
+
+    @Test
+    void keysMultiPassFromAnyNode() {
+
+        redis.mset(KeysAndValues.MAP);
+        this.connection.setReadFrom(ReadFrom.ANY);
 
         ScanIterator<String> scan = ScanIterator.scan(redis);
 
@@ -170,7 +185,6 @@ class ScanIteratorIntegrationTests extends TestSupport {
 
     @Test
     void setSinglePass() {
-
         redis.sadd(key, KeysAndValues.KEYS.toArray(new String[0]));
 
         ScanIterator<String> scan = ScanIterator.sscan(redis, key, ScanArgs.Builder.limit(50).match("key-11*"));

@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -114,6 +114,11 @@ public class RedisConditions {
      * @return {@literal true} if the command is present with the given arity.
      */
     public boolean hasCommandArity(String command, int arity) {
+
+        if (!hasCommand(command)) {
+            throw new IllegalStateException("Unknown command: " + command + " in " + commands);
+        }
+
         return commands.get(command.toUpperCase()) == arity;
     }
 
@@ -164,7 +169,7 @@ public class RedisConditions {
          * @param version must not be {@literal null} or empty.
          * @return
          */
-        static Version parse(String version) {
+        public static Version parse(String version) {
 
             Assert.hasText(version, "Version must not be null o empty!");
 

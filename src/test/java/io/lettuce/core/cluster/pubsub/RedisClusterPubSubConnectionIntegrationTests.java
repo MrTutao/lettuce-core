@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2019 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,7 @@ import io.lettuce.core.cluster.pubsub.api.sync.NodeSelectionPubSubCommands;
 import io.lettuce.core.cluster.pubsub.api.sync.PubSubNodeSelection;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.support.PubSubTestListener;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.LettuceExtension;
 
 /**
@@ -156,7 +156,8 @@ class RedisClusterPubSubConnectionIntegrationTests extends TestSupport {
 
         RedisClusterNode partition = pubSubConnection.getPartitions().getPartition(0);
 
-        StatefulRedisPubSubConnection<String, String> node = Futures.get(pubSubConnection.getConnectionAsync(partition
+        StatefulRedisPubSubConnection<String, String> node = TestFutures
+                .getOrTimeout(pubSubConnection.getConnectionAsync(partition
                 .getNodeId()));
 
         assertThat(node.sync().ping()).isEqualTo("PONG");
@@ -168,7 +169,8 @@ class RedisClusterPubSubConnectionIntegrationTests extends TestSupport {
         RedisClusterNode partition = pubSubConnection.getPartitions().getPartition(0);
 
         RedisURI uri = partition.getUri();
-        StatefulRedisPubSubConnection<String, String> node = Futures.get(pubSubConnection.getConnectionAsync(uri.getHost(),
+        StatefulRedisPubSubConnection<String, String> node = TestFutures
+                .getOrTimeout(pubSubConnection.getConnectionAsync(uri.getHost(),
                 uri.getPort()));
 
         assertThat(node.sync().ping()).isEqualTo("PONG");
@@ -230,7 +232,7 @@ class RedisClusterPubSubConnectionIntegrationTests extends TestSupport {
         PubSubAsyncNodeSelection<String, String> masters = pubSubConnection.async().masters();
         NodeSelectionPubSubAsyncCommands<String, String> commands = masters.commands();
 
-        Futures.await(commands.psubscribe("chann*"));
+        TestFutures.awaitOrTimeout(commands.psubscribe("chann*"));
 
         pubSubConnection2.sync().publish("channel", "message");
 

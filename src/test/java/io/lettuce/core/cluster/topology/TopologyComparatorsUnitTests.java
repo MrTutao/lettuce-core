@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -306,6 +306,17 @@ class TopologyComparatorsUnitTests {
         Partitions partitions1 = ClusterPartitionParser.parse(nodes1);
         Partitions partitions2 = ClusterPartitionParser.parse(nodes2);
         assertThat(isChanged(partitions1, partitions2)).isTrue();
+    }
+
+    @Test
+    void shouldConsiderNodesWithoutSlotsUnchanged() {
+
+        String nodes1 = "3d005a179da7d8dc1adae6409d47b39c369e992b 127.0.0.1:7380 slave - 0 1401258245007 2 disconnected\n"
+                + "c37ab8396be428403d4e55c0d317348be27ed973 127.0.0.1:7381 master - 111 1401258245007 222 connected 7000 12000 12002-16383\n";
+
+        Partitions partitions1 = ClusterPartitionParser.parse(nodes1);
+        Partitions partitions2 = ClusterPartitionParser.parse(nodes1);
+        assertThat(isChanged(partitions1, partitions2)).isFalse();
     }
 
     @Test

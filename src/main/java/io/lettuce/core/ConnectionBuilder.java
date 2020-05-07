@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,12 +22,13 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import reactor.core.publisher.Mono;
-import io.lettuce.core.codec.Utf8StringCodec;
 import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.protocol.*;
 import io.lettuce.core.resource.ClientResources;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.util.Timer;
 
@@ -38,29 +39,31 @@ import io.netty.util.Timer;
  */
 public class ConnectionBuilder {
 
-    private static final RedisCommandBuilder<String, String> INITIALIZING_CMD_BUILDER = new RedisCommandBuilder<>(
-            new Utf8StringCodec());
-    private static final Supplier<AsyncCommand<?, ?, ?>> PING_COMMAND_SUPPLIER = () -> new AsyncCommand<>(
-            INITIALIZING_CMD_BUILDER.ping());
-
     private Mono<SocketAddress> socketAddressSupplier;
     private ConnectionEvents connectionEvents;
     private RedisChannelHandler<?, ?> connection;
     private Endpoint endpoint;
     private Supplier<CommandHandler> commandHandlerSupplier;
     private ChannelGroup channelGroup;
-    private Timer timer;
     private Bootstrap bootstrap;
     private ClientOptions clientOptions;
     private Duration timeout;
     private ClientResources clientResources;
-    private char[] password;
+    private ConnectionInitializer connectionInitializer;
     private ReconnectionListener reconnectionListener = ReconnectionListener.NO_OP;
     private ConnectionWatchdog connectionWatchdog;
-    private Supplier<AsyncCommand<?, ?, ?>> pingCommandSupplier = PlainChannelInitializer.NO_PING;
 
     public static ConnectionBuilder connectionBuilder() {
         return new ConnectionBuilder();
+    }
+
+    /**
+     * Apply settings from {@link RedisURI}
+     *
+     * @param redisURI
+     */
+    public void apply(RedisURI redisURI) {
+        timeout(redisURI.getTimeout());
     }
 
     protected List<ChannelHandler> buildHandlers() {
@@ -70,18 +73,16 @@ public class ConnectionBuilder {
         LettuceAssert.assertState(connection != null, "Connection must be set");
         LettuceAssert.assertState(clientResources != null, "ClientResources must be set");
         LettuceAssert.assertState(endpoint != null, "Endpoint must be set");
+        LettuceAssert.assertState(connectionInitializer != null, "ConnectionInitializer must be set");
 
         List<ChannelHandler> handlers = new ArrayList<>();
 
         connection.setOptions(clientOptions);
 
-        handlers.add(new ChannelGroupListener(channelGroup));
+        handlers.add(new ChannelGroupListener(channelGroup, clientResources.eventBus()));
         handlers.add(new CommandEncoder());
+        handlers.add(getHandshakeHandler());
         handlers.add(commandHandlerSupplier.get());
-
-        if (clientOptions.isAutoReconnect()) {
-            handlers.add(createConnectionWatchdog());
-        }
 
         handlers.add(new ConnectionEventTrigger(connectionEvents, connection, clientResources.eventBus()));
 
@@ -92,22 +93,8 @@ public class ConnectionBuilder {
         return handlers;
     }
 
-    /**
-     * @deprecated since 5.2. PING during connection handshake becomes mandatory with RESP3. This method will be removed with
-     *             Lettuce 6.
-     */
-    @Deprecated
-    public void enablePingBeforeConnect() {
-        pingCommandSupplier = PING_COMMAND_SUPPLIER;
-    }
-
-    /**
-     * @deprecated since 5.2. PING during connection handshake becomes mandatory with RESP3. This method will be removed with
-     *             Lettuce 6.
-     */
-    @Deprecated
-    public void enableAuthPingBeforeConnect() {
-        pingCommandSupplier = () -> new AsyncCommand<>(INITIALIZING_CMD_BUILDER.auth(new String(password)));
+    protected ChannelHandler getHandshakeHandler() {
+        return new RedisHandshakeHandler(connectionInitializer, clientResources, timeout);
     }
 
     protected ConnectionWatchdog createConnectionWatchdog() {
@@ -117,10 +104,10 @@ public class ConnectionBuilder {
         }
 
         LettuceAssert.assertState(bootstrap != null, "Bootstrap must be set for autoReconnect=true");
-        LettuceAssert.assertState(timer != null, "Timer must be set for autoReconnect=true");
         LettuceAssert.assertState(socketAddressSupplier != null, "SocketAddressSupplier must be set for autoReconnect=true");
 
-        ConnectionWatchdog watchdog = new ConnectionWatchdog(clientResources.reconnectDelay(), clientOptions, bootstrap, timer,
+        ConnectionWatchdog watchdog = new ConnectionWatchdog(clientResources.reconnectDelay(), clientOptions, bootstrap,
+                clientResources.timer(),
                 clientResources.eventExecutorGroup(), socketAddressSupplier, reconnectionListener, connection,
                 clientResources.eventBus());
 
@@ -130,8 +117,8 @@ public class ConnectionBuilder {
         return watchdog;
     }
 
-    public RedisChannelInitializer build() {
-        return new PlainChannelInitializer(pingCommandSupplier, this::buildHandlers, clientResources, timeout);
+    public ChannelInitializer<Channel> build(SocketAddress socketAddress) {
+        return new PlainChannelInitializer(this::buildHandlers, clientResources);
     }
 
     public ConnectionBuilder socketAddressSupplier(Mono<SocketAddress> socketAddressSupplier) {
@@ -185,11 +172,6 @@ public class ConnectionBuilder {
         return this;
     }
 
-    public ConnectionBuilder timer(Timer timer) {
-        this.timer = timer;
-        return this;
-    }
-
     public ConnectionBuilder bootstrap(Bootstrap bootstrap) {
         this.bootstrap = bootstrap;
         return this;
@@ -205,8 +187,8 @@ public class ConnectionBuilder {
         return this;
     }
 
-    public ConnectionBuilder password(char[] password) {
-        this.password = password;
+    public ConnectionBuilder connectionInitializer(ConnectionInitializer connectionInitializer) {
+        this.connectionInitializer = connectionInitializer;
         return this;
     }
 
@@ -226,15 +208,32 @@ public class ConnectionBuilder {
         return clientResources;
     }
 
-    public char[] password() {
-        return password;
-    }
-
     public Endpoint endpoint() {
         return endpoint;
     }
 
-    Supplier<AsyncCommand<?, ?, ?>> getPingCommandSupplier() {
-        return pingCommandSupplier;
+    static class PlainChannelInitializer extends ChannelInitializer<Channel> {
+
+        private final Supplier<List<ChannelHandler>> handlers;
+        private final ClientResources clientResources;
+
+        PlainChannelInitializer(Supplier<List<ChannelHandler>> handlers, ClientResources clientResources) {
+            this.handlers = handlers;
+            this.clientResources = clientResources;
+        }
+
+        @Override
+        protected void initChannel(Channel channel) {
+            doInitialize(channel);
+        }
+
+        private void doInitialize(Channel channel) {
+
+            for (ChannelHandler handler : handlers.get()) {
+                channel.pipeline().addLast(handler);
+            }
+
+            clientResources.nettyCustomizer().afterChannelInitialized(channel);
+        }
     }
 }

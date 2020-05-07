@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
-import io.lettuce.core.ExceptionFactory;
+import io.lettuce.core.internal.ExceptionFactory;
 import io.lettuce.core.TransactionResult;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.internal.LettuceFactories;
@@ -39,6 +39,7 @@ public class MultiOutput<K, V> extends CommandOutput<K, V, TransactionResult> {
     private final Queue<RedisCommand<K, V, ?>> queue;
     private List<Object> responses = new ArrayList<>();
     private Boolean discarded;
+    private Integer multi;
 
     public MultiOutput(RedisCodec<K, V> codec) {
         super(codec, null);
@@ -64,7 +65,37 @@ public class MultiOutput<K, V> extends CommandOutput<K, V, TransactionResult> {
     }
 
     @Override
+    public void setSingle(ByteBuffer bytes) {
+        RedisCommand<K, V, ?> command = queue.peek();
+        if (command != null && command.getOutput() != null) {
+            command.getOutput().setSingle(bytes);
+        }
+    }
+
+    @Override
+    public void setBigNumber(ByteBuffer bytes) {
+        RedisCommand<K, V, ?> command = queue.peek();
+        if (command != null && command.getOutput() != null) {
+            command.getOutput().setBigNumber(bytes);
+        }
+    }
+
+    @Override
+    public void set(double number) {
+        RedisCommand<K, V, ?> command = queue.peek();
+        if (command != null && command.getOutput() != null) {
+            command.getOutput().set(number);
+        }
+    }
+
+    @Override
     public void set(ByteBuffer bytes) {
+
+        if (multi == null && bytes == null) {
+            discarded = true;
+            return;
+        }
+
         RedisCommand<K, V, ?> command = queue.peek();
         if (command != null && command.getOutput() != null) {
             command.getOutput().set(bytes);
@@ -74,6 +105,9 @@ public class MultiOutput<K, V> extends CommandOutput<K, V, TransactionResult> {
     @Override
     public void multi(int count) {
 
+        if (multi == null) {
+            multi = count;
+        }
         if (discarded == null) {
             discarded = count == -1;
         } else {

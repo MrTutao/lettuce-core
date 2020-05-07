@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2019 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,10 @@ package io.lettuce.core.cluster;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.RedisChannelWriter;
-import io.lettuce.core.RedisException;
-import io.lettuce.core.RedisURI;
+import io.lettuce.core.*;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.core.cluster.pubsub.RedisClusterPubSubListener;
@@ -44,12 +42,12 @@ import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 /**
  * @author Mark Paluch
  */
-class StatefulRedisClusterPubSubConnectionImpl<K, V> extends StatefulRedisPubSubConnectionImpl<K, V> implements
-        StatefulRedisClusterPubSubConnection<K, V> {
+class StatefulRedisClusterPubSubConnectionImpl<K, V> extends StatefulRedisPubSubConnectionImpl<K, V>
+        implements StatefulRedisClusterPubSubConnection<K, V> {
 
     private final PubSubClusterEndpoint<K, V> endpoint;
     private volatile Partitions partitions;
-    private volatile RedisState state;
+    private volatile CommandSet commandSet;
 
     /**
      * Initialize a new connection.
@@ -85,8 +83,8 @@ class StatefulRedisClusterPubSubConnectionImpl<K, V> extends StatefulRedisPubSub
     @Override
     protected RedisPubSubCommands<K, V> newRedisSyncCommandsImpl() {
 
-        return (RedisPubSubCommands) Proxy.newProxyInstance(AbstractRedisClient.class.getClassLoader(), new Class<?>[] {
-                RedisClusterPubSubCommands.class, RedisPubSubCommands.class }, syncInvocationHandler());
+        return (RedisPubSubCommands) Proxy.newProxyInstance(AbstractRedisClient.class.getClassLoader(),
+                new Class<?>[] { RedisClusterPubSubCommands.class, RedisPubSubCommands.class }, syncInvocationHandler());
     }
 
     private InvocationHandler syncInvocationHandler() {
@@ -104,18 +102,20 @@ class StatefulRedisClusterPubSubConnectionImpl<K, V> extends StatefulRedisPubSub
         return new RedisClusterPubSubReactiveCommandsImpl<K, V>(this, codec);
     }
 
-    RedisState getState() {
-        return state;
+    CommandSet getCommandSet() {
+        return commandSet;
     }
 
-    void setState(RedisState state) {
-        this.state = state;
+    void setCommandSet(CommandSet commandSet) {
+        this.commandSet = commandSet;
     }
 
     @Override
-    public void activated() {
-        super.activated();
+    protected List<RedisFuture<Void>> resubscribe() {
+
         async().clusterMyId().thenAccept(nodeId -> endpoint.setClusterNode(partitions.getPartitionByNodeId(nodeId)));
+
+        return super.resubscribe();
     }
 
     @Override

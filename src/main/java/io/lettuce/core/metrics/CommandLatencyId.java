@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,7 @@ public class CommandLatencyId implements Serializable, Comparable<CommandLatency
     private final SocketAddress localAddress;
     private final SocketAddress remoteAddress;
     private final ProtocolKeyword commandType;
+    private final String commandName;
 
     protected CommandLatencyId(SocketAddress localAddress, SocketAddress remoteAddress, ProtocolKeyword commandType) {
         LettuceAssert.notNull(localAddress, "LocalAddress must not be null");
@@ -42,6 +43,7 @@ public class CommandLatencyId implements Serializable, Comparable<CommandLatency
         this.localAddress = localAddress;
         this.remoteAddress = remoteAddress;
         this.commandType = commandType;
+        this.commandName = commandType.name();
     }
 
     /**
@@ -96,14 +98,14 @@ public class CommandLatencyId implements Serializable, Comparable<CommandLatency
             return false;
         if (!remoteAddress.equals(that.remoteAddress))
             return false;
-        return commandType.equals(that.commandType);
+        return commandName.equals(that.commandName);
     }
 
     @Override
     public int hashCode() {
         int result = localAddress.hashCode();
         result = 31 * result + remoteAddress.hashCode();
-        result = 31 * result + commandType.hashCode();
+        result = 31 * result + commandName.hashCode();
         return result;
     }
 
@@ -124,7 +126,7 @@ public class CommandLatencyId implements Serializable, Comparable<CommandLatency
             return localResult;
         }
 
-        return commandType.toString().compareTo(o.commandType.toString());
+        return commandName.compareTo(o.commandName);
     }
 
     @Override

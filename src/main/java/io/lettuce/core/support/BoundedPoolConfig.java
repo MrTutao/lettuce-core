@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -149,8 +149,7 @@ public class BoundedPoolConfig extends BasePoolConfig {
 
         /**
          * Configures the maximum number of objects that can be allocated by the pool (checked out to clients, or idle awaiting
-         * checkout) at a given time. When negative, there is no limit to the number of objects that can be managed by the pool
-         * at one time.
+         * checkout) at a given time.
          *
          * @param maxTotal maximum number of objects that can be allocated by the pool.
          * @return {@code this} {@link Builder}.
@@ -179,8 +178,7 @@ public class BoundedPoolConfig extends BasePoolConfig {
 
         /**
          * Configures the maximum number of objects that can be allocated by the pool (checked out to clients, or idle awaiting
-         * checkout) at a given time. When negative, there is no limit to the number of objects that can be managed by the pool
-         * at one time.
+         * checkout) at a given time.
          *
          * @param minIdle maximum number of objects that can be allocated by the pool.
          * @return {@code this} {@link Builder}.

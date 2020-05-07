@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,7 +36,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import io.lettuce.core.RedisException;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 
 /**
  * @author Mark Paluch
@@ -204,7 +204,7 @@ class AsyncPoolWithValidationUnitTests {
 
         BoundedAsyncPool<String> pool = new BoundedAsyncPool<>(factory, BoundedPoolConfig.builder().testOnAcquire().build());
 
-        pool.release(Futures.get(pool.acquire()));
+        pool.release(TestFutures.getOrTimeout(pool.acquire()));
 
         assertThat(pool.getIdle()).isEqualTo(1);
         assertThat(pool.getObjectCount()).isEqualTo(1);
@@ -223,7 +223,7 @@ class AsyncPoolWithValidationUnitTests {
 
         BoundedAsyncPool<String> pool = new BoundedAsyncPool<>(factory, BoundedPoolConfig.builder().testOnAcquire().build());
 
-        pool.release(Futures.get(pool.acquire()));
+        pool.release(TestFutures.getOrTimeout(pool.acquire()));
 
         assertThat(pool.getIdle()).isEqualTo(1);
         assertThat(pool.getObjectCount()).isEqualTo(1);
@@ -246,7 +246,7 @@ class AsyncPoolWithValidationUnitTests {
 
         BoundedAsyncPool<String> pool = new BoundedAsyncPool<>(factory, BoundedPoolConfig.builder().testOnAcquire().build());
 
-        pool.release(Futures.get(pool.acquire()));
+        pool.release(TestFutures.getOrTimeout(pool.acquire()));
 
         assertThat(pool.getIdle()).isEqualTo(1);
         assertThat(pool.getObjectCount()).isEqualTo(1);
@@ -269,7 +269,7 @@ class AsyncPoolWithValidationUnitTests {
 
         BoundedAsyncPool<String> pool = new BoundedAsyncPool<>(factory, BoundedPoolConfig.builder().testOnRelease().build());
 
-        Futures.await(pool.release(Futures.get(pool.acquire())));
+        TestFutures.awaitOrTimeout(pool.release(TestFutures.getOrTimeout(pool.acquire())));
 
         assertThat(pool.getIdle()).isEqualTo(1);
         assertThat(pool.getObjectCount()).isEqualTo(1);
@@ -288,7 +288,7 @@ class AsyncPoolWithValidationUnitTests {
 
         BoundedAsyncPool<String> pool = new BoundedAsyncPool<>(factory, BoundedPoolConfig.builder().testOnRelease().build());
 
-        CompletableFuture<Void> release = pool.release(Futures.get(pool.acquire()));
+        CompletableFuture<Void> release = pool.release(TestFutures.getOrTimeout(pool.acquire()));
 
         assertThat(pool.getIdle()).isZero();
         assertThat(pool.getObjectCount()).isZero();
@@ -305,7 +305,7 @@ class AsyncPoolWithValidationUnitTests {
 
         BoundedAsyncPool<String> pool = new BoundedAsyncPool<>(factory, BoundedPoolConfig.builder().testOnRelease().build());
 
-        CompletableFuture<Void> release = pool.release(Futures.get(pool.acquire()));
+        CompletableFuture<Void> release = pool.release(TestFutures.getOrTimeout(pool.acquire()));
 
         assertThat(pool.getIdle()).isZero();
         assertThat(pool.getObjectCount()).isZero();
@@ -342,7 +342,7 @@ class AsyncPoolWithValidationUnitTests {
 
         assertThat(pool.getIdle()).isEqualTo(5);
 
-        String object = Futures.get(pool.acquire());
+        String object = TestFutures.getOrTimeout(pool.acquire());
         pool.release(object);
 
         assertThat(pool.getIdle()).isEqualTo(5);

@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,11 +29,12 @@ import io.lettuce.core.internal.LettuceAssert;
  * @author Mark Paluch
  * @since 5.1
  */
-public class StreamReadOutput<K, V> extends CommandOutput<K, V, List<StreamMessage<K, V>>> implements
-        StreamingOutput<StreamMessage<K, V>> {
+public class StreamReadOutput<K, V> extends CommandOutput<K, V, List<StreamMessage<K, V>>>
+        implements StreamingOutput<StreamMessage<K, V>> {
 
     private boolean initialized;
     private Subscriber<StreamMessage<K, V>> subscriber;
+    private boolean skipStreamKeyReset = false;
     private K stream;
     private K key;
     private String id;
@@ -48,7 +49,12 @@ public class StreamReadOutput<K, V> extends CommandOutput<K, V, List<StreamMessa
     public void set(ByteBuffer bytes) {
 
         if (stream == null) {
+            if (bytes == null) {
+                return;
+            }
+
             stream = codec.decodeKey(bytes);
+            skipStreamKeyReset = true;
             return;
         }
 
@@ -82,15 +88,24 @@ public class StreamReadOutput<K, V> extends CommandOutput<K, V, List<StreamMessa
     @Override
     public void complete(int depth) {
 
-        if (depth == 1) {
-            stream = null;
-        }
-
-        if (depth == 3) {
+        if (depth == 3 && body != null) {
             subscriber.onNext(output, new StreamMessage<>(stream, id, body));
             key = null;
-            id = null;
             body = null;
+            id = null;
+        }
+
+        // RESP2/RESP3 compat
+        if (depth == 2 && skipStreamKeyReset) {
+            skipStreamKeyReset = false;
+        }
+
+        if (depth == 1) {
+            if (skipStreamKeyReset) {
+                skipStreamKeyReset = false;
+            } else {
+                stream = null;
+            }
         }
     }
 

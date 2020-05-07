@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,18 +39,18 @@ public class TimeoutProvider {
 
     /**
      * Creates a new {@link TimeoutProvider} given {@link TimeoutOptions supplier} and {@link LongSupplier default timeout
-     * supplier}.
+     * supplier in nano seconds}.
      *
      * @param timeoutOptionsSupplier must not be {@literal null}.
-     * @param defaultTimeoutSupplier must not be {@literal null}.
+     * @param defaultTimeoutNsSupplier must not be {@literal null}.
      */
-    public TimeoutProvider(Supplier<TimeoutOptions> timeoutOptionsSupplier, LongSupplier defaultTimeoutSupplier) {
+    public TimeoutProvider(Supplier<TimeoutOptions> timeoutOptionsSupplier, LongSupplier defaultTimeoutNsSupplier) {
 
         LettuceAssert.notNull(timeoutOptionsSupplier, "TimeoutOptionsSupplier must not be null");
-        LettuceAssert.notNull(defaultTimeoutSupplier, "Default TimeoutSupplier must not be null");
+        LettuceAssert.notNull(defaultTimeoutNsSupplier, "Default TimeoutSupplier must not be null");
 
         this.timeoutOptionsSupplier = timeoutOptionsSupplier;
-        this.defaultTimeoutSupplier = defaultTimeoutSupplier;
+        this.defaultTimeoutSupplier = defaultTimeoutNsSupplier;
     }
 
     /**
@@ -72,7 +72,7 @@ public class TimeoutProvider {
             timeoutNs = state.timeoutSource.getTimeUnit().toNanos(state.timeoutSource.getTimeout(command));
         }
 
-        return timeoutNs > 0 ? timeoutNs : defaultTimeoutSupplier.getAsLong();
+        return timeoutNs >= 0 ? timeoutNs : defaultTimeoutSupplier.getAsLong();
     }
 
     static class State {

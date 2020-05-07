@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,22 +36,12 @@ import io.lettuce.core.resource.ClientResources;
 public interface StatefulConnection<K, V> extends AutoCloseable, AsyncCloseable {
 
     /**
-     * Set the default command timeout for this connection.
+     * Set the default command timeout for this connection. A zero timeout value indicates to not time out.
      *
      * @param timeout Command timeout.
      * @since 5.0
      */
     void setTimeout(Duration timeout);
-
-    /**
-     * Set the default command timeout for this connection.
-     *
-     * @param timeout Command timeout.
-     * @param unit Unit of time for the timeout.
-     * @deprecated since 5.0, use {@link #setTimeout(Duration)}
-     */
-    @Deprecated
-    void setTimeout(long timeout, TimeUnit unit);
 
     /**
      * @return the timeout.

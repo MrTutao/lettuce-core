@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ public interface RedisClusterAsyncCommands<K, V> extends BaseRedisAsyncCommands<
         RedisSortedSetAsyncCommands<K, V>, RedisStreamAsyncCommands<K, V>, RedisStringAsyncCommands<K, V> {
 
     /**
-     * Set the default timeout for operations.
+     * Set the default timeout for operations. A zero timeout value indicates to not time out.
      *
      * @param timeout the timeout value
      * @since 5.0
@@ -46,22 +46,22 @@ public interface RedisClusterAsyncCommands<K, V> extends BaseRedisAsyncCommands<
     void setTimeout(Duration timeout);
 
     /**
-     * Set the default timeout for operations.
-     *
-     * @param timeout the timeout value
-     * @param unit the unit of the timeout value
-     * @deprecated since 5.0, use {@link #setTimeout(Duration)}.
-     */
-    @Deprecated
-    void setTimeout(long timeout, TimeUnit unit);
-
-    /**
      * Authenticate to the server.
      *
      * @param password the password
      * @return String simple-string-reply
      */
-    String auth(String password);
+    RedisFuture<String> auth(CharSequence password);
+
+    /**
+     * Authenticate to the server with username and password. Requires Redis 6 or newer.
+     *
+     * @param username the username
+     * @param password the password
+     * @return String simple-string-reply
+     * @since 6.0
+     */
+    RedisFuture<String> auth(String username, CharSequence password);
 
     /**
      * Generate a new config epoch, incrementing the current epoch, assign the new epoch to this node, WITHOUT any consensus and

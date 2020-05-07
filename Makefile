@@ -49,24 +49,24 @@ vars currentEpoch 3 lastVoteEpoch 0
 endef
 
 define REDIS_CLUSTER_CONFIG_SSL_1
-27f88788f03a86296b7d860152f4ae24ee59c8c9 127.0.0.1:7479@17479 myself,master - 0 1434887920102 1 connected 0-10000
-1c541b6daf98719769e6aacf338a7d81f108a180 127.0.0.1:7480@17480 slave 27f88788f03a86296b7d860152f4ae24ee59c8c9 0 1434887920102 3 connected
-2c07344ffa94ede5ea57a2367f190af6144c1adb 127.0.0.1:7481@17481 master  - 0 0 2 connected 10001-16384
-vars currentEpoch 3 lastVoteEpoch 0
+cf2354ef19ee813a962350b51438314aebce1fe2 127.0.0.1:7479@17479 myself,master - 0 1578163609000 0 connected 0-10000
+cac8e053dd6f85fab470be57d29dcbac2a4b85c4 127.0.0.1:7480@17480 slave cf2354ef19ee813a962350b51438314aebce1fe2 0 1578163609301 1 connected
+6554e5b1b158dccd4b1d9ca294a3e46a2d3e556d 127.0.0.1:7481@17481 master - 0 1578163609301 2 connected 10001-16383
+vars currentEpoch 2 lastVoteEpoch 0
 endef
 
 define REDIS_CLUSTER_CONFIG_SSL_2
-27f88788f03a86296b7d860152f4ae24ee59c8c9 127.0.0.1:7479@17479 master - 0 1434887920102 1 connected 0-10000
-1c541b6daf98719769e6aacf338a7d81f108a180 127.0.0.1:7480@17480 myself,slave 27f88788f03a86296b7d860152f4ae24ee59c8c9 0 1434887920102 3 connected
-2c07344ffa94ede5ea57a2367f190af6144c1adb 127.0.0.1:7481@17481 master  - 0 0 2 connected 10001-16384
-vars currentEpoch 3 lastVoteEpoch 0
+cf2354ef19ee813a962350b51438314aebce1fe2 127.0.0.1:7479@17479 master - 0 1578163609245 0 connected  0-10000
+cac8e053dd6f85fab470be57d29dcbac2a4b85c4 127.0.0.1:7480@17480 myself,slave cf2354ef19ee813a962350b51438314aebce1fe2 0 1578163609000 1 connected
+6554e5b1b158dccd4b1d9ca294a3e46a2d3e556d 127.0.0.1:7481@17481 master - 0 1578163609245 2 connected 10001-16383
+vars currentEpoch 2 lastVoteEpoch 0
 endef
 
 define REDIS_CLUSTER_CONFIG_SSL_3
-27f88788f03a86296b7d860152f4ae24ee59c8c9 127.0.0.1:7479@17479 master - 0 1434887920102 1 connected 0-10000
-1c541b6daf98719769e6aacf338a7d81f108a180 127.0.0.1:7480@17480 slave 27f88788f03a86296b7d860152f4ae24ee59c8c9 0 1434887920102 3 connected
-2c07344ffa94ede5ea57a2367f190af6144c1adb 127.0.0.1:7481@17481 myself,master  - 0 0 2 connected 10001-16384
-vars currentEpoch 3 lastVoteEpoch 0
+cac8e053dd6f85fab470be57d29dcbac2a4b85c4 127.0.0.1:7480@17480 slave cf2354ef19ee813a962350b51438314aebce1fe2 0 1578163609279 1 connected
+cf2354ef19ee813a962350b51438314aebce1fe2 127.0.0.1:7479@17479 master - 0 1578163609279 0 connected 0-10000
+6554e5b1b158dccd4b1d9ca294a3e46a2d3e556d 127.0.0.1:7481@17481 myself,master - 0 1578163609000 2 connected 10001-16383
+vars currentEpoch 2 lastVoteEpoch 0
 endef
 
 
@@ -230,8 +230,8 @@ cluster-start: work/cluster-node-7379.pid work/cluster-node-7380.pid work/cluste
 work/stunnel.conf:
 	@mkdir -p $(@D)
 
-	@echo cert=$(ROOT_DIR)/work/ca/certs/foo-host.cert.pem >> $@
-	@echo key=$(ROOT_DIR)/work/ca/private/foo-host.decrypted.key.pem >> $@
+	@echo cert=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
+	@echo key=$(ROOT_DIR)/work/ca/private/localhost.decrypted.key.pem >> $@
 	@echo capath=$(ROOT_DIR)/work/ca/certs/ca.cert.pem >> $@
 	@echo cafile=$(ROOT_DIR)/work/ca/certs/ca.cert.pem >> $@
 	@echo delay=yes >> $@
@@ -242,13 +242,11 @@ work/stunnel.conf:
 	@echo accept = 127.0.0.1:6443 >> $@
 	@echo connect = 127.0.0.1:6479 >> $@
 
-	@echo [stunnel-2] >> $@
+	@echo [foo-host] >> $@
 	@echo accept = 127.0.0.1:6444 >> $@
 	@echo connect = 127.0.0.1:6479 >> $@
-	@echo cert=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo key=$(ROOT_DIR)/work/ca/private/localhost.decrypted.key.pem >> $@
-	@echo capath=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo cafile=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
+	@echo cert=$(ROOT_DIR)/work/ca/certs/foo-host.cert.pem >> $@
+	@echo key=$(ROOT_DIR)/work/ca/private/foo-host.decrypted.key.pem >> $@
 
 	@echo [ssl-cluster-node-1] >> $@
 	@echo accept = 127.0.0.1:7443 >> $@
@@ -285,26 +283,15 @@ work/stunnel.conf:
 	@echo [stunnel-client-cert] >> $@
 	@echo accept = 127.0.0.1:6445 >> $@
 	@echo connect = 127.0.0.1:6479 >> $@
-	@echo cert=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo key=$(ROOT_DIR)/work/ca/private/localhost.decrypted.key.pem >> $@
-	@echo cafile=$(ROOT_DIR)/work/ca/certs/ca.cert.pem >> $@
 	@echo verify=2 >> $@
 
 	@echo [stunnel-master-slave-node-1] >> $@
 	@echo accept = 127.0.0.1:8443 >> $@
 	@echo connect = 127.0.0.1:6482 >> $@
-	@echo cert=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo key=$(ROOT_DIR)/work/ca/private/localhost.decrypted.key.pem >> $@
-	@echo capath=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo cafile=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
 
 	@echo [stunnel-master-slave-node-2] >> $@
 	@echo accept = 127.0.0.1:8444 >> $@
 	@echo connect = 127.0.0.1:6483 >> $@
-	@echo cert=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo key=$(ROOT_DIR)/work/ca/private/localhost.decrypted.key.pem >> $@
-	@echo capath=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
-	@echo cafile=$(ROOT_DIR)/work/ca/certs/localhost.cert.pem >> $@
 
 work/stunnel.pid: work/stunnel.conf ssl-keys
 	which stunnel4 >/dev/null 2>&1 && stunnel4 $(ROOT_DIR)/work/stunnel.conf || stunnel $(ROOT_DIR)/work/stunnel.conf

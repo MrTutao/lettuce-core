@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.test.resource.DefaultRedisClient;
-import io.lettuce.test.resource.FastShutdown;
 import io.lettuce.test.resource.TestClientResources;
 
 /**
@@ -76,29 +75,6 @@ public abstract class AbstractRedisClientTest extends TestSupport {
     public void closeConnection() throws Exception {
         if (redis != null) {
             redis.getStatefulConnection().close();
-        }
-    }
-
-    public abstract class WithPasswordRequired {
-        protected abstract void run(RedisClient client) throws Exception;
-
-        protected WithPasswordRequired() {
-            try {
-                redis.configSet("requirepass", passwd);
-                redis.auth(passwd);
-
-                RedisClient client = newRedisClient();
-                try {
-                    run(client);
-                } catch (Exception e) {
-                    throw new IllegalStateException(e);
-                } finally {
-                    FastShutdown.shutdown(client);
-                }
-            } finally {
-
-                redis.configSet("requirepass", "");
-            }
         }
     }
 }

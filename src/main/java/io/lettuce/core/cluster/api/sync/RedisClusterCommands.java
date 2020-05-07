@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,13 +29,13 @@ import io.lettuce.core.api.sync.*;
  * @author Mark Paluch
  * @since 4.0
  */
-public interface RedisClusterCommands<K, V> extends BaseRedisCommands<K, V>, RedisGeoCommands<K, V>, RedisHashCommands<K, V>,
-        RedisHLLCommands<K, V>, RedisKeyCommands<K, V>, RedisListCommands<K, V>, RedisScriptingCommands<K, V>,
-        RedisServerCommands<K, V>, RedisSetCommands<K, V>, RedisSortedSetCommands<K, V>, RedisStreamCommands<K, V>,
-        RedisStringCommands<K, V> {
+public interface RedisClusterCommands<K, V>
+        extends BaseRedisCommands<K, V>, RedisGeoCommands<K, V>, RedisHashCommands<K, V>, RedisHLLCommands<K, V>,
+        RedisKeyCommands<K, V>, RedisListCommands<K, V>, RedisScriptingCommands<K, V>, RedisServerCommands<K, V>,
+        RedisSetCommands<K, V>, RedisSortedSetCommands<K, V>, RedisStreamCommands<K, V>, RedisStringCommands<K, V> {
 
     /**
-     * Set the default timeout for operations.
+     * Set the default timeout for operations. A zero timeout value indicates to not time out.
      *
      * @param timeout the timeout value
      * @since 5.0
@@ -43,22 +43,22 @@ public interface RedisClusterCommands<K, V> extends BaseRedisCommands<K, V>, Red
     void setTimeout(Duration timeout);
 
     /**
-     * Set the default timeout for operations.
-     *
-     * @param timeout the timeout value
-     * @param unit the unit of the timeout value
-     * @deprecated since 5.0, use {@link #setTimeout(Duration)}.
-     */
-    @Deprecated
-    void setTimeout(long timeout, TimeUnit unit);
-
-    /**
      * Authenticate to the server.
      *
      * @param password the password
      * @return String simple-string-reply
      */
-    String auth(String password);
+    String auth(CharSequence password);
+
+    /**
+     * Authenticate to the server with username and password. Requires Redis 6 or newer.
+     *
+     * @param username the username
+     * @param password the password
+     * @return String simple-string-reply
+     * @since 6.0
+     */
+    String auth(String username, CharSequence password);
 
     /**
      * Generate a new config epoch, incrementing the current epoch, assign the new epoch to this node, WITHOUT any consensus and
@@ -284,8 +284,8 @@ public interface RedisClusterCommands<K, V> extends BaseRedisCommands<K, V>, Red
     String clusterFlushslots();
 
     /**
-     * Tells a Redis cluster replica node that the client is ok reading possibly stale data and is not interested in running write
-     * queries.
+     * Tells a Redis cluster replica node that the client is ok reading possibly stale data and is not interested in running
+     * write queries.
      *
      * @return String simple-string-reply
      */

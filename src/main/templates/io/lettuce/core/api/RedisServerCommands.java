@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -103,6 +103,14 @@ public interface RedisServerCommands<K, V> {
      *         each line is composed of a succession of property=value fields separated by a space character.
      */
     String clientList();
+
+    /**
+     * Get the id of the current connection.
+     *
+     * @return Long The command just returns the ID of the current connection.
+     * @since 5.3
+     */
+    Long clientId();
 
     /**
      * Returns an array reply of details about all Redis commands.

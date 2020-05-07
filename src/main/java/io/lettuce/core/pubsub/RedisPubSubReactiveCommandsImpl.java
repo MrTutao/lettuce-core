@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,9 +32,10 @@ import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
  * @param <K> Key type.
  * @param <V> Value type.
  * @author Mark Paluch
+ * @since 5.0
  */
-public class RedisPubSubReactiveCommandsImpl<K, V> extends RedisReactiveCommandsImpl<K, V> implements
-        RedisPubSubReactiveCommands<K, V> {
+public class RedisPubSubReactiveCommandsImpl<K, V> extends RedisReactiveCommandsImpl<K, V>
+        implements RedisPubSubReactiveCommands<K, V> {
 
     private final PubSubCommandBuilder<K, V> commandBuilder;
 

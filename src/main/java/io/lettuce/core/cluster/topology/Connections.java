@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,33 +15,35 @@
  */
 package io.lettuce.core.cluster.topology;
 
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
+import io.lettuce.core.internal.ExceptionFactory;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.StringCodec;
-import io.lettuce.core.internal.Futures;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.Command;
 import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.core.protocol.CommandKeyword;
 import io.lettuce.core.protocol.CommandType;
+import io.lettuce.core.resource.ClientResources;
 
 /**
  * @author Mark Paluch
  * @author Christian Weitendorf
+ * @author Xujs
  */
 class Connections {
 
+    private final ClientResources clientResources;
     private final Map<RedisURI, StatefulRedisConnection<String, String>> connections;
     private volatile boolean closed = false;
 
-    public Connections() {
-        connections = new TreeMap<>(TopologyComparators.RedisURIComparator.INSTANCE);
-    }
-
-    private Connections(Map<RedisURI, StatefulRedisConnection<String, String>> connections) {
+    public Connections(ClientResources clientResources, Map<RedisURI, StatefulRedisConnection<String, String>> connections) {
+        this.clientResources = clientResources;
         this.connections = connections;
     }
 
@@ -83,42 +85,51 @@ class Connections {
      *
      * @return the {@link Requests}.
      */
-    public Requests requestTopology() {
+    public Requests requestTopology(long timeout, TimeUnit timeUnit) {
 
-        Requests requests = new Requests();
+        return doRequest(() -> {
 
-        synchronized (this.connections) {
-            for (Map.Entry<RedisURI, StatefulRedisConnection<String, String>> entry : this.connections.entrySet()) {
-
-                CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(CommandKeyword.NODES);
-                Command<String, String, String> command = new Command<>(CommandType.CLUSTER, new StatusOutput<>(
-                        StringCodec.UTF8), args);
-                TimedAsyncCommand<String, String, String> timedCommand = new TimedAsyncCommand<>(command);
-
-                entry.getValue().dispatch(timedCommand);
-                requests.addRequest(entry.getKey(), timedCommand);
-            }
-        }
-
-        return requests;
+            CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(CommandKeyword.NODES);
+            Command<String, String, String> command = new Command<>(CommandType.CLUSTER, new StatusOutput<>(StringCodec.UTF8),
+                    args);
+            return new TimedAsyncCommand<>(command);
+        }, timeout, timeUnit);
     }
 
     /*
-     * Initiate {@code CLIENT LIST} on all connections and return the {@link Requests}.
+     * Initiate {@code INFO CLIENTS} on all connections and return the {@link Requests}.
      *
      * @return the {@link Requests}.
      */
-    public Requests requestClients() {
+    public Requests requestClients(long timeout, TimeUnit timeUnit) {
+
+        return doRequest(() -> {
+
+            Command<String, String, String> command = new Command<>(CommandType.INFO, new StatusOutput<>(StringCodec.UTF8),
+                    new CommandArgs<>(StringCodec.UTF8).add("CLIENTS"));
+            return new TimedAsyncCommand<>(command);
+        }, timeout, timeUnit);
+    }
+
+    /*
+     * Initiate {@code CLUSTER NODES} on all connections and return the {@link Requests}.
+     *
+     * @return the {@link Requests}.
+     */
+    private Requests doRequest(Supplier<TimedAsyncCommand<String, String, String>> commandFactory, long timeout,
+            TimeUnit timeUnit) {
 
         Requests requests = new Requests();
+        Duration timeoutDuration = Duration.ofNanos(timeUnit.toNanos(timeout));
 
         synchronized (this.connections) {
             for (Map.Entry<RedisURI, StatefulRedisConnection<String, String>> entry : this.connections.entrySet()) {
 
-                CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(CommandKeyword.LIST);
-                Command<String, String, String> command = new Command<>(CommandType.CLIENT,
-                        new StatusOutput<>(StringCodec.UTF8), args);
-                TimedAsyncCommand<String, String, String> timedCommand = new TimedAsyncCommand<>(command);
+                TimedAsyncCommand<String, String, String> timedCommand = commandFactory.get();
+
+                clientResources.timer().newTimeout(it -> {
+                    timedCommand.completeExceptionally(ExceptionFactory.createTimeoutException(timeoutDuration));
+                }, timeout, timeUnit);
 
                 entry.getValue().dispatch(timedCommand);
                 requests.addRequest(entry.getKey(), timedCommand);
@@ -128,68 +139,16 @@ class Connections {
         return requests;
     }
 
-    /**
-     * Close all connections.
-     */
-    public void close() {
+    public Connections retainAll(Set<RedisURI> connectionsToRetain) {
 
-        this.closed = true;
+        Set<RedisURI> keys = new LinkedHashSet<>(connections.keySet());
 
-        List<CompletableFuture<?>> closeFutures = new ArrayList<>();
-        while (hasConnections()) {
-            for (StatefulRedisConnection<String, String> connection : drainConnections()) {
-                closeFutures.add(connection.closeAsync());
+        for (RedisURI key : keys) {
+            if (!connectionsToRetain.contains(key)) {
+                this.connections.remove(key);
             }
         }
 
-        Futures.allOf(closeFutures).join();
-    }
-
-    private boolean hasConnections() {
-
-        synchronized (this.connections) {
-            return !this.connections.isEmpty();
-        }
-    }
-
-    private Collection<StatefulRedisConnection<String, String>> drainConnections() {
-
-        Map<RedisURI, StatefulRedisConnection<String, String>> drainedConnections;
-
-        synchronized (this.connections) {
-
-            drainedConnections = new HashMap<>(this.connections);
-            drainedConnections.forEach((k, v) -> {
-                this.connections.remove(k);
-            });
-        }
-
-        return drainedConnections.values();
-    }
-
-    /**
-     * Merges this and {@code discoveredConnections} into a new {@link Connections} instance. This instance is marked as closed
-     * to prevent lingering connections.
-     *
-     * @param discoveredConnections
-     * @return
-     */
-    public Connections mergeWith(Connections discoveredConnections) {
-
-        Map<RedisURI, StatefulRedisConnection<String, String>> result = new TreeMap<>(
-                TopologyComparators.RedisURIComparator.INSTANCE);
-
-        this.closed = true;
-        discoveredConnections.closed = true;
-
-        synchronized (this.connections) {
-            synchronized (discoveredConnections.connections) {
-
-                result.putAll(this.connections);
-                result.putAll(discoveredConnections.connections);
-            }
-        }
-
-        return new Connections(result);
+        return this;
     }
 }

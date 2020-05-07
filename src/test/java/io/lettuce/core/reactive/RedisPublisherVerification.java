@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ import io.lettuce.core.RedisURI;
 import io.lettuce.core.TestRedisPublisher;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.output.ValueListOutput;
 import io.lettuce.core.protocol.Command;
 import io.lettuce.core.protocol.CommandArgs;
@@ -47,7 +47,6 @@ import io.lettuce.test.settings.TestSettings;
  */
 public class RedisPublisherVerification extends PublisherVerification<String> {
 
-    private static final Utf8StringCodec CODEC = new Utf8StringCodec();
     private static RedisClient client;
     private static StatefulRedisConnection<String, String> connection;
 
@@ -85,8 +84,8 @@ public class RedisPublisherVerification extends PublisherVerification<String> {
         }
 
         Supplier<Command<String, String, List<String>>> supplier = () -> {
-            CommandArgs<String, String> args = new CommandArgs<>(CODEC).addKey(key).add(0).add(-1);
-            return new Command<>(LRANGE, new ValueListOutput<>(CODEC), args);
+            CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).addKey(key).add(0).add(-1);
+            return new Command<>(LRANGE, new ValueListOutput<>(StringCodec.UTF8), args);
         };
 
         return new TestRedisPublisher(supplier, connection, true);

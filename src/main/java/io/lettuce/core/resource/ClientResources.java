@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -89,7 +89,7 @@ public interface ClientResources {
          * Sets the {@link CommandLatencyCollectorOptions} that can that can be used across different instances of the
          * RedisClient. The options are only effective if no {@code commandLatencyCollector} is provided.
          *
-         * @param commandLatencyCollectorOptions the command latency collector options, must not be {@link null}.
+         * @param commandLatencyCollectorOptions the command latency collector options, must not be {@literal null}.
          * @return {@code this} {@link Builder}.
          */
         Builder commandLatencyCollectorOptions(CommandLatencyCollectorOptions commandLatencyCollectorOptions);
@@ -116,7 +116,7 @@ public interface ClientResources {
          * Sets the {@link SocketAddressResolver} that is used to resolve {@link io.lettuce.core.RedisURI} to
          * {@link java.net.SocketAddress}. Defaults to {@link SocketAddressResolver} using the configured {@link DnsResolver}.
          *
-         * @param socketAddressResolver the socket address resolver, must not be {@link null}.
+         * @param socketAddressResolver the socket address resolver, must not be {@literal null}.
          * @return {@code this} {@link Builder}.
          * @since 5.1
          */
@@ -126,7 +126,7 @@ public interface ClientResources {
          * Sets the {@link DnsResolver} that is used to resolve hostnames to {@link java.net.InetAddress}. Defaults to
          * {@link DnsResolvers#JVM_DEFAULT}
          *
-         * @param dnsResolver the DNS resolver, must not be {@link null}.
+         * @param dnsResolver the DNS resolver, must not be {@literal null}.
          * @return {@code this} {@link Builder}.
          * @since 4.3
          */
@@ -231,7 +231,7 @@ public interface ClientResources {
      * Returns a builder to create new {@link ClientResources} whose settings are replicated from the current
      * {@link ClientResources}.
      *
-     * @return a a {@link ClientResources.Builder} to create new {@link ClientResources} whose settings are replicated from the
+     * @return a {@link ClientResources.Builder} to create new {@link ClientResources} whose settings are replicated from the
      *         current {@link ClientResources}
      *
      * @since 5.1

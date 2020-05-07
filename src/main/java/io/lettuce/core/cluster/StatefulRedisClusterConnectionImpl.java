@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import io.lettuce.core.*;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -40,10 +41,11 @@ import io.lettuce.core.cluster.api.sync.RedisAdvancedClusterCommands;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.LettuceAssert;
-import io.lettuce.core.output.StatusOutput;
-import io.lettuce.core.protocol.*;
+import io.lettuce.core.protocol.CommandArgsAccessor;
+import io.lettuce.core.protocol.CompleteableCommand;
+import io.lettuce.core.protocol.ConnectionWatchdog;
+import io.lettuce.core.protocol.RedisCommand;
 
 /**
  * A thread-safe connection to a Redis Cluster. Multiple threads may share one {@link StatefulRedisClusterConnectionImpl}
@@ -54,21 +56,18 @@ import io.lettuce.core.protocol.*;
  * @author Mark Paluch
  * @since 4.0
  */
-public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandler<K, V> implements
-        StatefulRedisClusterConnection<K, V> {
-
-    private Partitions partitions;
-
-    private char[] password;
-    private boolean readOnly;
-    private String clientName;
+public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandler<K, V>
+        implements StatefulRedisClusterConnection<K, V> {
 
     protected final RedisCodec<K, V> codec;
     protected final RedisAdvancedClusterCommands<K, V> sync;
     protected final RedisAdvancedClusterAsyncCommandsImpl<K, V> async;
     protected final RedisAdvancedClusterReactiveCommandsImpl<K, V> reactive;
 
-    private volatile RedisState state;
+    private final ClusterConnectionState connectionState = new ClusterConnectionState();
+
+    private Partitions partitions;
+    private volatile CommandSet commandSet;
 
     /**
      * Initialize a new connection.
@@ -108,12 +107,12 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         return reactive;
     }
 
-    RedisState getState() {
-        return state;
+    CommandSet getCommandSet() {
+        return commandSet;
     }
 
-    void setState(RedisState state) {
-        this.state = state;
+    void setCommandSet(CommandSet commandSet) {
+        this.commandSet = commandSet;
     }
 
     private RedisURI lookup(String nodeId) {
@@ -135,8 +134,8 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
             throw new RedisException("NodeId " + nodeId + " does not belong to the cluster");
         }
 
-        return getClusterDistributionChannelWriter().getClusterConnectionProvider().getConnection(
-                ClusterConnectionProvider.Intent.WRITE, nodeId);
+        return getClusterDistributionChannelWriter().getClusterConnectionProvider()
+                .getConnection(ClusterConnectionProvider.Intent.WRITE, nodeId);
     }
 
     @Override
@@ -157,8 +156,8 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
     @Override
     public StatefulRedisConnection<K, V> getConnection(String host, int port) {
 
-        return getClusterDistributionChannelWriter().getClusterConnectionProvider().getConnection(
-                ClusterConnectionProvider.Intent.WRITE, host, port);
+        return getClusterDistributionChannelWriter().getClusterConnectionProvider()
+                .getConnection(ClusterConnectionProvider.Intent.WRITE, host, port);
     }
 
     @Override
@@ -170,36 +169,8 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         return provider.getConnectionAsync(ClusterConnectionProvider.Intent.WRITE, host, port);
     }
 
-    public ClusterDistributionChannelWriter getClusterDistributionChannelWriter() {
+    ClusterDistributionChannelWriter getClusterDistributionChannelWriter() {
         return (ClusterDistributionChannelWriter) super.getChannelWriter();
-    }
-
-    @Override
-    public void activated() {
-
-        super.activated();
-        // do not block in here, since the channel flow will be interrupted.
-        if (password != null) {
-            async.authAsync(password);
-        }
-
-        if (clientName != null) {
-            setClientName(clientName);
-        }
-
-        if (readOnly) {
-            async.readOnly();
-        }
-    }
-
-    void setClientName(String clientName) {
-
-        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(CommandKeyword.SETNAME).addValue(clientName);
-        AsyncCommand<String, String, String> async = new AsyncCommand<>(new Command<>(CommandType.CLIENT, new StatusOutput<>(
-                StringCodec.UTF8), args));
-        this.clientName = clientName;
-
-        dispatch((RedisCommand) async);
     }
 
     @Override
@@ -225,16 +196,15 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         if (local.getType().name().equals(AUTH.name())) {
             local = attachOnComplete(local, status -> {
                 if (status.equals("OK")) {
-                    char[] password = CommandArgsAccessor.getFirstCharArray(command.getArgs());
+                    List<char[]> args = CommandArgsAccessor.getCharArrayArguments(command.getArgs());
 
-                    if (password != null) {
-                        this.password = password;
+                    if (!args.isEmpty()) {
+                        this.connectionState.setUserNamePassword(args);
                     } else {
 
-                        String stringPassword = CommandArgsAccessor.getFirstString(command.getArgs());
-                        if (stringPassword != null) {
-                            this.password = stringPassword.toCharArray();
-                        }
+                        List<String> stringArgs = CommandArgsAccessor.getStringArguments(command.getArgs());
+                        this.connectionState
+                                .setUserNamePassword(stringArgs.stream().map(String::toCharArray).collect(Collectors.toList()));
                     }
                 }
             });
@@ -243,7 +213,7 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         if (local.getType().name().equals(READONLY.name())) {
             local = attachOnComplete(local, status -> {
                 if (status.equals("OK")) {
-                    this.readOnly = true;
+                    this.connectionState.setReadOnly(true);
                 }
             });
         }
@@ -251,7 +221,7 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         if (local.getType().name().equals(READWRITE.name())) {
             local = attachOnComplete(local, status -> {
                 if (status.equals("OK")) {
-                    this.readOnly = false;
+                    this.connectionState.setReadOnly(false);
                 }
             });
         }
@@ -285,5 +255,27 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
     @Override
     public ReadFrom getReadFrom() {
         return getClusterDistributionChannelWriter().getReadFrom();
+    }
+
+    ConnectionState getConnectionState() {
+        return connectionState;
+    }
+
+    static class ClusterConnectionState extends ConnectionState {
+
+        @Override
+        protected void setUserNamePassword(List<char[]> args) {
+            super.setUserNamePassword(args);
+        }
+
+        @Override
+        protected void setDb(int db) {
+            super.setDb(db);
+        }
+
+        @Override
+        protected void setReadOnly(boolean readOnly) {
+            super.setReadOnly(readOnly);
+        }
     }
 }

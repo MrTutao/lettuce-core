@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.lettuce.core.resource;
-
-import static io.lettuce.core.resource.Futures.toBooleanPromise;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -76,12 +74,12 @@ public class DefaultClientResources implements ClientResources {
     /**
      * Minimum number of I/O threads.
      */
-    public static final int MIN_IO_THREADS = 3;
+    public static final int MIN_IO_THREADS = 2;
 
     /**
      * Minimum number of computation threads.
      */
-    public static final int MIN_COMPUTATION_THREADS = 3;
+    public static final int MIN_COMPUTATION_THREADS = 2;
 
     public static final int DEFAULT_IO_THREADS;
     public static final int DEFAULT_COMPUTATION_THREADS;
@@ -98,10 +96,8 @@ public class DefaultClientResources implements ClientResources {
 
     static {
 
-        int threads = Math.max(
-                1,
-                SystemPropertyUtil.getInt("io.netty.eventLoopThreads",
-                        Math.max(MIN_IO_THREADS, Runtime.getRuntime().availableProcessors())));
+        int threads = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads",
+                Math.max(MIN_IO_THREADS, Runtime.getRuntime().availableProcessors())));
 
         DEFAULT_IO_THREADS = threads;
         DEFAULT_COMPUTATION_THREADS = threads;
@@ -395,7 +391,7 @@ public class DefaultClientResources implements ClientResources {
          * Sets the {@link CommandLatencyCollectorOptions} that can that can be used across different instances of the
          * RedisClient. The options are only effective if no {@code commandLatencyCollector} is provided.
          *
-         * @param commandLatencyCollectorOptions the command latency collector options, must not be {@link null}.
+         * @param commandLatencyCollectorOptions the command latency collector options, must not be {@literal null}.
          * @return {@code this} {@link Builder}.
          */
         @Override
@@ -427,7 +423,7 @@ public class DefaultClientResources implements ClientResources {
          * Sets the {@link SocketAddressResolver} that is used to resolve {@link io.lettuce.core.RedisURI} to
          * {@link java.net.SocketAddress}. Defaults to {@link SocketAddressResolver} using the configured {@link DnsResolver}.
          *
-         * @param socketAddressResolver the socket address resolver, must not be {@link null}.
+         * @param socketAddressResolver the socket address resolver, must not be {@literal null}.
          * @return {@code this} {@link ClientResources.Builder}.
          * @since 5.1
          */
@@ -444,7 +440,7 @@ public class DefaultClientResources implements ClientResources {
          * Sets the {@link DnsResolver} that is used to resolve hostnames to {@link java.net.InetAddress}. Defaults to
          * {@link DnsResolvers#JVM_DEFAULT}
          *
-         * @param dnsResolver the DNS resolver, must not be {@link null}.
+         * @param dnsResolver the DNS resolver, must not be {@literal null}.
          * @return {@code this} {@link Builder}.
          * @since 4.3
          */
@@ -601,22 +597,8 @@ public class DefaultClientResources implements ClientResources {
         logger.debug("Initiate shutdown ({}, {}, {})", quietPeriod, timeout, timeUnit);
 
         shutdownCalled = true;
-        DefaultPromise<Boolean> overall = new DefaultPromise<Boolean>(GlobalEventExecutor.INSTANCE);
-        DefaultPromise<Boolean> lastRelease = new DefaultPromise<Boolean>(GlobalEventExecutor.INSTANCE);
-        Futures.PromiseAggregator<Boolean, Promise<Boolean>> aggregator = new Futures.PromiseAggregator<Boolean, Promise<Boolean>>(
-                overall);
-
-        aggregator.expectMore(1);
-
-        if (!sharedEventLoopGroupProvider) {
-            aggregator.expectMore(1);
-        }
-
-        if (!sharedEventExecutor) {
-            aggregator.expectMore(1);
-        }
-
-        aggregator.arm();
+        DefaultPromise<Void> voidPromise = new DefaultPromise<>(ImmediateEventExecutor.INSTANCE);
+        PromiseCombiner aggregator = new PromiseCombiner(ImmediateEventExecutor.INSTANCE);
 
         if (metricEventPublisher != null) {
             metricEventPublisher.shutdown();
@@ -628,26 +610,21 @@ public class DefaultClientResources implements ClientResources {
 
         if (!sharedEventLoopGroupProvider) {
             Future<Boolean> shutdown = eventLoopGroupProvider.shutdown(quietPeriod, timeout, timeUnit);
-            if (shutdown instanceof Promise) {
-                aggregator.add((Promise<Boolean>) shutdown);
-            } else {
-                aggregator.add(toBooleanPromise(shutdown));
-            }
+            aggregator.add(shutdown);
         }
 
         if (!sharedEventExecutor) {
             Future<?> shutdown = eventExecutorGroup.shutdownGracefully(quietPeriod, timeout, timeUnit);
-            aggregator.add(toBooleanPromise(shutdown));
+            aggregator.add(shutdown);
         }
 
         if (!sharedCommandLatencyCollector) {
             commandLatencyCollector.shutdown();
         }
 
-        aggregator.add(lastRelease);
-        lastRelease.setSuccess(null);
+        aggregator.finish(voidPromise);
 
-        return toBooleanPromise(overall);
+        return PromiseAdapter.toBooleanPromise(voidPromise);
     }
 
     @Override

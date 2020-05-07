@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,10 +17,7 @@ package io.lettuce.core.dynamic.support;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.*;
 
 import io.lettuce.core.LettuceStrings;
 import io.lettuce.core.dynamic.support.TypeWrapper.MethodParameterTypeProvider;
@@ -384,7 +381,7 @@ public class ResolvableType implements Serializable {
     public ResolvableType[] getInterfaces() {
         Class<?> resolved = resolve();
         Object[] array = resolved.getGenericInterfaces();
-        if (resolved == null || (array == null || array.length == 0)) {
+        if (array == null || array.length == 0) {
             return EMPTY_TYPES_ARRAY;
         }
         if (this.interfaces == null) {
@@ -767,6 +764,14 @@ public class ResolvableType implements Serializable {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(type, typeProvider, variableResolver, componentType, resolved, superType);
+        result = 31 * result + Arrays.hashCode(interfaces);
+        result = 31 * result + Arrays.hashCode(generics);
+        return result;
     }
 
     /**

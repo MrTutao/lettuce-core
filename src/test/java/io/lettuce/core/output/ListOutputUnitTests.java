@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,7 @@ import java.util.List;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 
 /**
  * @author Mark Paluch
@@ -35,15 +35,13 @@ class ListOutputUnitTests {
 
     static Collection<Fixture> parameters() {
 
-        Utf8StringCodec codec = new Utf8StringCodec();
-
-        KeyListOutput<String, String> keyListOutput = new KeyListOutput<>(codec);
+        KeyListOutput<String, String> keyListOutput = new KeyListOutput<>(StringCodec.UTF8);
         Fixture keyList = new Fixture(keyListOutput, keyListOutput, "hello world".getBytes(), "hello world");
 
-        ValueListOutput<String, String> valueListOutput = new ValueListOutput<>(codec);
+        ValueListOutput<String, String> valueListOutput = new ValueListOutput<>(StringCodec.UTF8);
         Fixture valueList = new Fixture(valueListOutput, valueListOutput, "hello world".getBytes(), "hello world");
 
-        StringListOutput<String, String> stringListOutput = new StringListOutput<>(codec);
+        StringListOutput<String, String> stringListOutput = new StringListOutput<>(StringCodec.UTF8);
         Fixture stringList = new Fixture(stringListOutput, stringListOutput, "hello world".getBytes(), "hello world");
 
         return Arrays.asList(keyList, valueList, stringList);

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,9 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 import io.lettuce.core.protocol.CommandKeyword;
+import io.lettuce.core.protocol.ProtocolKeyword;
 import io.netty.channel.local.LocalAddress;
 
 /**
+ * Unit tests for {@link CommandLatencyId}.
+ *
  * @author Mark Paluch
  */
 class CommandLatencyIdUnitTests {
@@ -38,5 +41,36 @@ class CommandLatencyIdUnitTests {
     void testValues() {
         assertThat(sut.localAddress()).isEqualTo(LocalAddress.ANY);
         assertThat(sut.remoteAddress()).isEqualTo(new LocalAddress("me"));
+    }
+
+    @Test
+    void testEquality() {
+        assertThat(sut).isEqualTo(CommandLatencyId.create(LocalAddress.ANY, new LocalAddress("me"), new MyCommand("ADDR")));
+        assertThat(sut).isNotEqualTo(CommandLatencyId.create(LocalAddress.ANY, new LocalAddress("me"), new MyCommand("FOO")));
+    }
+
+    @Test
+    void testHashCode() {
+        assertThat(sut)
+                .hasSameHashCodeAs(CommandLatencyId.create(LocalAddress.ANY, new LocalAddress("me"), new MyCommand("ADDR")));
+    }
+
+    static class MyCommand implements ProtocolKeyword {
+
+        final String name;
+
+        public MyCommand(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public byte[] getBytes() {
+            return name.getBytes();
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
     }
 }

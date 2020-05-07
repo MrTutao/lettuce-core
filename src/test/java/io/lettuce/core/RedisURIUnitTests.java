@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,8 @@ import org.junit.jupiter.api.Test;
 import io.lettuce.core.internal.LettuceSets;
 
 /**
+ * Unit tests for {@link RedisURI}
+ *
  * @author Mark Paluch
  */
 class RedisURIUnitTests {
@@ -42,7 +44,7 @@ class RedisURIUnitTests {
 
         assertThat(redisURI1).isEqualTo(redisURI2);
         assertThat(redisURI1.hashCode()).isEqualTo(redisURI2.hashCode());
-        assertThat(redisURI1.toString()).contains("localhost").contains("1234");
+        assertThat(redisURI1).hasToString("redis://auth@localhost:1234/5");
 
         assertThat(redisURI3).isNotEqualTo(redisURI2);
         assertThat(redisURI3.hashCode()).isNotEqualTo(redisURI2.hashCode());
@@ -75,7 +77,8 @@ class RedisURIUnitTests {
     @Test
     void simpleUriTest() {
         RedisURI redisURI = RedisURI.create("redis://localhost:6379");
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis://localhost");
+        assertThat(redisURI).hasToString("redis://localhost");
+        assertThat(redisURI).hasToString("redis://localhost");
     }
 
     @Test
@@ -86,19 +89,19 @@ class RedisURIUnitTests {
     @Test
     void sslUriTest() {
         RedisURI redisURI = RedisURI.create("redis+ssl://localhost:6379");
-        assertThat(redisURI.toURI().toString()).isEqualTo("rediss://localhost:6379");
+        assertThat(redisURI).hasToString("rediss://localhost:6379");
     }
 
     @Test
     void tlsUriTest() {
         RedisURI redisURI = RedisURI.create("redis+tls://localhost:6379");
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis+tls://localhost:6379");
+        assertThat(redisURI).hasToString("redis+tls://localhost:6379");
     }
 
     @Test
     void multipleClusterNodesTest() {
         RedisURI redisURI = RedisURI.create("redis+ssl://password@host1:6379,host2:6380");
-        assertThat(redisURI.toURI().toString()).isEqualTo("rediss://password@host1:6379,host2:6380");
+        assertThat(redisURI).hasToString("rediss://password@host1:6379,host2:6380");
     }
 
     @Test
@@ -126,8 +129,7 @@ class RedisURIUnitTests {
         assertThat(redisURI.getSentinels().get(2).getPort()).isEqualTo(1234);
         assertThat(redisURI.getDatabase()).isEqualTo(5);
 
-        assertThat(redisURI.toURI().toString()).isEqualTo(
-                "redis-sentinel://auth@h1:222,h2,h3:1234?database=5&sentinelMasterId=masterId");
+        assertThat(redisURI).hasToString("redis-sentinel://auth@h1:222,h2,h3:1234/5?sentinelMasterId=masterId");
     }
 
     @Test
@@ -136,8 +138,7 @@ class RedisURIUnitTests {
         RedisURI redisURI = RedisURI.create("rediss-sentinel://auth@h1:222,h2,h3:1234/5?sentinelMasterId=masterId");
         assertThat(redisURI.isSsl()).isTrue();
 
-        assertThat(redisURI.toURI().toString()).isEqualTo(
-                "rediss-sentinel://auth@h1:222,h2,h3:1234?database=5&sentinelMasterId=masterId");
+        assertThat(redisURI).hasToString("rediss-sentinel://auth@h1:222,h2,h3:1234/5?sentinelMasterId=masterId");
     }
 
     @Test
@@ -145,7 +146,7 @@ class RedisURIUnitTests {
 
         RedisURI redisURI1 = RedisURI.create("redis-socket:///var/tmp/socket");
         RedisURI redisURI2 = RedisURI.create("redis-socket:///var/tmp/socket");
-        RedisURI redisURI3 = RedisURI.create("redis-socket:///var/tmp/other-socket?db=2");
+        RedisURI redisURI3 = RedisURI.create("redis-socket:///var/tmp/other-socket?database=2");
 
         assertThat(redisURI1).isEqualTo(redisURI2);
         assertThat(redisURI1.hashCode()).isEqualTo(redisURI2.hashCode());
@@ -153,6 +154,7 @@ class RedisURIUnitTests {
 
         assertThat(redisURI3).isNotEqualTo(redisURI2);
         assertThat(redisURI3.hashCode()).isNotEqualTo(redisURI2.hashCode());
+        assertThat(redisURI3).hasToString("redis-socket:///var/tmp/other-socket?database=2");
     }
 
     @Test
@@ -162,7 +164,7 @@ class RedisURIUnitTests {
 
         assertThat(redisURI.getDatabase()).isEqualTo(2);
         assertThat(redisURI.getSocket()).isEqualTo("/var/tmp/other-socket");
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis-socket:///var/tmp/other-socket?database=2");
+        assertThat(redisURI).hasToString("redis-socket:///var/tmp/other-socket?database=2");
     }
 
     @Test
@@ -172,7 +174,7 @@ class RedisURIUnitTests {
 
         assertThat(redisURI.getDatabase()).isEqualTo(2);
         assertThat(redisURI.getSocket()).isEqualTo("/var/tmp/other-socket");
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis-socket:///var/tmp/other-socket?database=2");
+        assertThat(redisURI).hasToString("redis-socket:///var/tmp/other-socket?database=2");
     }
 
     @Test
@@ -190,11 +192,10 @@ class RedisURIUnitTests {
         checkUriTimeout("redis://auth@localhost:1234/5?timeout=-1", 0, TimeUnit.MILLISECONDS);
 
         RedisURI defaultUri = new RedisURI();
-        checkUriTimeout("redis://auth@localhost:1234/5?timeout=junk", defaultUri.getTimeout().getSeconds(),
-                RedisURI.DEFAULT_TIMEOUT_UNIT);
+        checkUriTimeout("redis://auth@localhost:1234/5?timeout=junk", defaultUri.getTimeout().getSeconds(), TimeUnit.SECONDS);
 
         RedisURI redisURI = RedisURI.create("redis://auth@localhost:1234/5?timeout=5000ms");
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis://auth@localhost:1234?database=5&timeout=5s");
+        assertThat(redisURI).hasToString("redis://auth@localhost:1234/5?timeout=5s");
     }
 
     @Test
@@ -223,7 +224,7 @@ class RedisURIUnitTests {
         RedisURI redisURI = RedisURI.create("redis://auth@localhost:1234/?database=21");
         assertThat(redisURI.getDatabase()).isEqualTo(21);
 
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis://auth@localhost:1234?database=21");
+        assertThat(redisURI).hasToString("redis://auth@localhost:1234/21");
     }
 
     @Test
@@ -231,7 +232,7 @@ class RedisURIUnitTests {
         RedisURI redisURI = RedisURI.create("redis://auth@localhost:1234/?clientName=hello");
         assertThat(redisURI.getClientName()).isEqualTo("hello");
 
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis://auth@localhost:1234?clientName=hello");
+        assertThat(redisURI).hasToString("redis://auth@localhost:1234?clientName=hello");
     }
 
     @Test
@@ -241,6 +242,6 @@ class RedisURIUnitTests {
         assertThat(redisURI.getDatabase()).isEqualTo(0);
         assertThat(redisURI.getSentinelMasterId()).isNull();
 
-        assertThat(redisURI.toURI().toString()).isEqualTo("redis://host:1234");
+        assertThat(redisURI).hasToString("redis://host:1234");
     }
 }

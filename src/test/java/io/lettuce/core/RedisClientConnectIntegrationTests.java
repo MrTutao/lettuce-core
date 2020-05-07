@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.sentinel.api.StatefulRedisSentinelConnection;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.LettuceExtension;
 
 /**
@@ -107,7 +107,7 @@ class RedisClientConnectIntegrationTests extends TestSupport {
     void connectAsyncCodecOwnUri() {
         RedisURI redisURI = redis(host, port).build();
         ConnectionFuture<StatefulRedisConnection<String, String>> future = client.connectAsync(UTF8, redisURI);
-        StatefulRedisConnection<String, String> connection = Futures.get(future.toCompletableFuture());
+        StatefulRedisConnection<String, String> connection = TestFutures.getOrTimeout(future.toCompletableFuture());
         assertThat(connection.getTimeout()).isEqualTo(redisURI.getTimeout());
         connection.close();
     }
@@ -134,7 +134,7 @@ class RedisClientConnectIntegrationTests extends TestSupport {
             redisClient.shutdown(0, 0, SECONDS); // deadlock expected.
             }).toCompletableFuture();
 
-        assertThatThrownBy(() -> Futures.await(f)).isInstanceOf(TimeoutException.class);
+        assertThatThrownBy(() -> TestFutures.awaitOrTimeout(f)).isInstanceOf(TimeoutException.class);
     }
 
     @Test
@@ -147,7 +147,7 @@ class RedisClientConnectIntegrationTests extends TestSupport {
             return redisClient.shutdownAsync(0, 0, SECONDS);
         }).toCompletableFuture();
 
-        Futures.await(f);
+        TestFutures.awaitOrTimeout(f);
     }
 
     /*

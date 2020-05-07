@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,14 +17,12 @@ package io.lettuce.core.cluster;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -45,8 +43,10 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.ClusterNodeConnectionFactory.ConnectionKey;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.AsyncConnectionProvider;
-import io.lettuce.test.Futures;
+import io.lettuce.core.protocol.ProtocolVersion;
+import io.lettuce.core.resource.ClientResources;
 import io.lettuce.test.LettuceExtension;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.settings.TestSettings;
 import io.netty.channel.ConnectTimeoutException;
 
@@ -56,15 +56,16 @@ import io.netty.channel.ConnectTimeoutException;
 @ExtendWith(LettuceExtension.class)
 class AsyncConnectionProviderIntegrationTests {
 
-    private final RedisClusterClient redisClient;
+    private final ClientResources resources;
+    private RedisClusterClient client;
     private ServerSocket serverSocket;
     private CountDownLatch connectInitiated = new CountDownLatch(1);
 
     private AsyncConnectionProvider<ConnectionKey, StatefulRedisConnection<String, String>, ConnectionFuture<StatefulRedisConnection<String, String>>> sut;
 
     @Inject
-    AsyncConnectionProviderIntegrationTests(RedisClusterClient redisClient) {
-        this.redisClient = redisClient;
+    AsyncConnectionProviderIntegrationTests(ClientResources resources) {
+        this.resources = resources;
     }
 
     @BeforeEach
@@ -72,17 +73,17 @@ class AsyncConnectionProviderIntegrationTests {
 
         serverSocket = new ServerSocket(SocketUtils.findAvailableTcpPort(), 1);
 
-        sut = new AsyncConnectionProvider<>(
-                new AbstractClusterNodeConnectionFactory<String, String>(redisClient.getResources()) {
+        client = RedisClusterClient.create(resources, "redis://localhost");
+        client.setOptions(ClusterClientOptions.builder().protocolVersion(ProtocolVersion.RESP2).build());
+        sut = new AsyncConnectionProvider<>(new AbstractClusterNodeConnectionFactory<String, String>(resources) {
             @Override
             public ConnectionFuture<StatefulRedisConnection<String, String>> apply(ConnectionKey connectionKey) {
 
                 RedisURI redisURI = RedisURI.create(TestSettings.host(), serverSocket.getLocalPort());
                 redisURI.setTimeout(Duration.ofSeconds(5));
 
-                ConnectionFuture<StatefulRedisConnection<String, String>> future = redisClient.connectToNodeAsync(
-                        StringCodec.UTF8, "", null,
-                        Mono.just(new InetSocketAddress(connectionKey.host, serverSocket.getLocalPort())));
+                ConnectionFuture<StatefulRedisConnection<String, String>> future = client.connectToNodeAsync(StringCodec.UTF8,
+                        "", null, Mono.just(new InetSocketAddress(connectionKey.host, serverSocket.getLocalPort())));
 
                 connectInitiated.countDown();
 
@@ -94,35 +95,6 @@ class AsyncConnectionProviderIntegrationTests {
     @AfterEach
     void after() throws Exception {
         serverSocket.close();
-    }
-
-    @Test
-    void shouldCreateConnection() throws IOException {
-
-        ConnectionKey connectionKey = new ConnectionKey(ClusterConnectionProvider.Intent.READ, TestSettings.host(),
-                TestSettings.port());
-        StatefulRedisConnection<String, String> connection = Futures
-                .get(sut.getConnection(connectionKey).toCompletableFuture());
-
-        assertThat(Futures.get(sut.getConnection(connectionKey).toCompletableFuture())).isSameAs(connection);
-        sut.close();
-        serverSocket.accept();
-    }
-
-    @Test
-    void shouldMaintainConnectionCount() throws IOException {
-
-        ConnectionKey connectionKey = new ConnectionKey(ClusterConnectionProvider.Intent.READ, TestSettings.host(),
-                TestSettings.port());
-
-        assertThat(sut.getConnectionCount()).isEqualTo(0);
-
-        Futures.await(sut.getConnection(connectionKey).toCompletableFuture());
-
-        assertThat(sut.getConnectionCount()).isEqualTo(1);
-        sut.close();
-
-        serverSocket.accept();
     }
 
     @Test
@@ -147,10 +119,10 @@ class AsyncConnectionProviderIntegrationTests {
                 TestSettings.port());
 
         sut.getConnection(connectionKey);
-        Futures.await(sut.close());
+        TestFutures.awaitOrTimeout(sut.close());
 
         assertThat(sut.getConnectionCount()).isEqualTo(0);
-        Futures.await(sut.close());
+        TestFutures.awaitOrTimeout(sut.close());
 
         serverSocket.accept();
     }
@@ -160,21 +132,23 @@ class AsyncConnectionProviderIntegrationTests {
 
         Socket socket = new Socket(TestSettings.host(), serverSocket.getLocalPort());
 
-        ClusterClientOptions clientOptions = ClusterClientOptions.builder()
+        ClusterClientOptions clientOptions = ClusterClientOptions.builder().protocolVersion(ProtocolVersion.RESP2)
                 .socketOptions(SocketOptions.builder().connectTimeout(1, TimeUnit.SECONDS).build()).build();
 
-        redisClient.setOptions(clientOptions);
+        client.setOptions(clientOptions);
 
         ConnectionKey connectionKey = new ConnectionKey(ClusterConnectionProvider.Intent.READ, "8.8.8.8", TestSettings.port());
 
         StopWatch stopWatch = new StopWatch();
 
-        assertThatThrownBy(() -> Futures.await(sut.getConnection(connectionKey))).hasCauseInstanceOf(
+        assertThatThrownBy(() -> TestFutures.awaitOrTimeout(sut.getConnection(connectionKey)))
+                .hasCauseInstanceOf(
                 ConnectTimeoutException.class);
 
         stopWatch.start();
 
-        assertThatThrownBy(() -> Futures.await(sut.getConnection(connectionKey))).hasCauseInstanceOf(
+        assertThatThrownBy(() -> TestFutures.awaitOrTimeout(sut.getConnection(connectionKey)))
+                .hasCauseInstanceOf(
                 ConnectTimeoutException.class);
 
         stopWatch.stop();
@@ -191,10 +165,10 @@ class AsyncConnectionProviderIntegrationTests {
 
         Socket socket = new Socket(TestSettings.host(), serverSocket.getLocalPort());
 
-        ClusterClientOptions clientOptions = ClusterClientOptions.builder()
+        ClusterClientOptions clientOptions = ClusterClientOptions.builder().protocolVersion(ProtocolVersion.RESP2)
                 .socketOptions(SocketOptions.builder().connectTimeout(1, TimeUnit.SECONDS).build()).build();
 
-        redisClient.setOptions(clientOptions);
+        client.setOptions(clientOptions);
 
         ConnectionKey connectionKey = new ConnectionKey(ClusterConnectionProvider.Intent.READ, "8.8.8.8", TestSettings.port());
 
@@ -228,51 +202,6 @@ class AsyncConnectionProviderIntegrationTests {
         assertThat(stopWatch.getLastTaskTimeMillis()).isBetween(0L, 1300L);
 
         sut.close();
-        socket.close();
-    }
-
-    @Test
-    void shouldCloseAsync() throws Exception {
-
-        assumeTrue(System.getProperty("os.name").toLowerCase().contains("mac"));
-
-        Socket socket = new Socket("localhost", serverSocket.getLocalPort());
-        CountDownLatch connectInitiated = new CountDownLatch(1);
-
-        ClusterClientOptions clientOptions = ClusterClientOptions.builder()
-                .socketOptions(SocketOptions.builder().connectTimeout(1, TimeUnit.SECONDS).build()).build();
-
-        redisClient.setOptions(clientOptions);
-
-        ConnectionKey connectionKey = new ConnectionKey(ClusterConnectionProvider.Intent.READ, TestSettings.host(),
-                TestSettings.port());
-
-        CompletableFuture<StatefulRedisConnection<String, String>> createdConnection = new CompletableFuture<>();
-        Thread t1 = new Thread(() -> {
-            try {
-                CompletableFuture<StatefulRedisConnection<String, String>> future = sut.getConnection(connectionKey)
-                        .toCompletableFuture();
-
-                connectInitiated.countDown();
-                StatefulRedisConnection<String, String> connection = Futures.get(future);
-                createdConnection.complete(connection);
-            } catch (Exception e) {
-                createdConnection.completeExceptionally(e);
-            }
-        });
-
-        t1.start();
-
-        connectInitiated.await();
-
-        sut.close();
-
-        serverSocket.accept();
-
-        StatefulRedisConnection<String, String> connection = createdConnection.join();
-
-        assertThat(connection.isOpen()).isFalse();
-
         socket.close();
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -178,10 +178,10 @@ public interface RedisAdvancedClusterReactiveCommands<K, V> extends RedisCluster
     /**
      * Return a random key from the keyspace on a random master.
      *
-     * @return V bulk-string-reply the random key, or {@literal null} when the database is empty.
+     * @return K bulk-string-reply the random key, or a {@link Mono} that completes empty when the database is empty.
      * @see RedisKeyReactiveCommands#randomkey()
      */
-    Mono<V> randomkey();
+    Mono<K> randomkey();
 
     /**
      * Remove all the scripts from the script cache on all cluster nodes.
@@ -204,8 +204,18 @@ public interface RedisAdvancedClusterReactiveCommands<K, V> extends RedisCluster
      *
      * @param script script content
      * @return String bulk-string-reply This command returns the SHA1 digest of the script added into the script cache.
+     * @since 6.0
      */
-    Mono<String> scriptLoad(V script);
+    Mono<String> scriptLoad(String script);
+
+    /**
+     * Load the specified Lua script into the script cache on all cluster nodes.
+     *
+     * @param script script content
+     * @return String bulk-string-reply This command returns the SHA1 digest of the script added into the script cache.
+     * @since 6.0
+     */
+    Mono<String> scriptLoad(byte[] script);
 
     /**
      * Synchronously save the dataset to disk and then shut down all nodes of the cluster.

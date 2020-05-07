@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,8 @@
  */
 package io.lettuce.core.cluster.topology;
 
-import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
@@ -25,9 +26,11 @@ import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 
 /**
  * @author Mark Paluch
+ * @author Xujs
  */
 class NodeTopologyView {
 
+    private static final Pattern NUMBER = Pattern.compile("(\\d+)");
     private final boolean available;
     private final RedisURI redisURI;
 
@@ -39,7 +42,7 @@ class NodeTopologyView {
 
     private final String clientList;
 
-    NodeTopologyView(RedisURI redisURI) {
+    private NodeTopologyView(RedisURI redisURI) {
 
         this.available = false;
         this.redisURI = redisURI;
@@ -62,27 +65,26 @@ class NodeTopologyView {
         this.latency = latency;
     }
 
-    static NodeTopologyView from(RedisURI redisURI, Requests clusterNodesRequests, Requests clientListRequests)
-            throws ExecutionException, InterruptedException {
+    static NodeTopologyView from(RedisURI redisURI, Requests clusterNodesRequests, Requests clientListRequests) {
 
         TimedAsyncCommand<String, String, String> nodes = clusterNodesRequests.getRequest(redisURI);
         TimedAsyncCommand<String, String, String> clients = clientListRequests.getRequest(redisURI);
 
         if (resultAvailable(nodes) && resultAvailable(clients)) {
-            return new NodeTopologyView(redisURI, nodes.get(), optionallyGet(clients), nodes.duration());
+            return new NodeTopologyView(redisURI, nodes.join(), optionallyGet(clients), nodes.duration());
         }
         return new NodeTopologyView(redisURI);
     }
 
-    private static <T> T optionallyGet(TimedAsyncCommand<?, ?, T> command) throws ExecutionException, InterruptedException {
+    private static <T> T optionallyGet(TimedAsyncCommand<?, ?, T> command) {
 
         if (command.isCompletedExceptionally()) {
             return null;
         }
-        return command.get();
+        return command.join();
     }
 
-    static boolean resultAvailable(RedisFuture<?> redisFuture) {
+    private static boolean resultAvailable(RedisFuture<?> redisFuture) {
 
         if (redisFuture != null && redisFuture.isDone() && !redisFuture.isCancelled()) {
             return true;
@@ -92,7 +94,15 @@ class NodeTopologyView {
     }
 
     private int getClients(String rawClientsOutput) {
-        return rawClientsOutput.trim().split("\\n").length;
+        String[] rows = rawClientsOutput.trim().split("\\n");
+        for (String row : rows) {
+
+            Matcher matcher = NUMBER.matcher(row);
+            if (matcher.find()) {
+                return Integer.parseInt(matcher.group(1));
+            }
+        }
+        return 0;
     }
 
     long getLatency() {

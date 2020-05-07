@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 package io.lettuce.core.protocol;
 
-import static io.lettuce.core.ConnectionEvents.Activated;
-import static io.lettuce.core.ConnectionEvents.PingBeforeActivate;
 import static io.lettuce.core.ConnectionEvents.Reset;
 
 import java.io.IOException;
@@ -33,6 +31,7 @@ import io.lettuce.core.internal.LettuceSets;
 import io.lettuce.core.output.CommandOutput;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.tracing.TraceContext;
+import io.lettuce.core.tracing.TraceContextProvider;
 import io.lettuce.core.tracing.Tracer;
 import io.lettuce.core.tracing.Tracing;
 import io.netty.buffer.ByteBuf;
@@ -75,7 +74,6 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
     private final ArrayDeque<RedisCommand<?, ?, ?>> stack = new ArrayDeque<>();
     private final long commandHandlerId = COMMAND_HANDLER_COUNTER.incrementAndGet();
 
-    private final RedisStateMachine rsm = new RedisStateMachine();
     private final boolean traceEnabled = logger.isTraceEnabled();
     private final boolean debugEnabled = logger.isDebugEnabled();
     private final boolean latencyMetricsEnabled;
@@ -85,7 +83,8 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
     private final boolean boundedQueues;
     private final BackpressureSource backpressureSource = new BackpressureSource();
 
-    Channel channel;
+    private RedisStateMachine rsm;
+    private Channel channel;
     private ByteBuf buffer;
     private LifecycleState lifecycleState = LifecycleState.NOT_CONNECTED;
     private String logPrefix;
@@ -162,9 +161,15 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
             logger.debug("{} channelRegistered()", logPrefix());
         }
 
+        tracedEndpoint = clientResources.tracing().createEndpoint(ctx.channel().remoteAddress());
+        logPrefix = null;
+        pristine = true;
+        fallbackCommand = null;
+
         setState(LifecycleState.REGISTERED);
 
-        buffer = ctx.alloc().directBuffer(8192 * 8);
+        buffer = ctx.alloc().buffer(8192 * 8);
+        rsm = new RedisStateMachine(ctx.alloc());
         ctx.fireChannelRegistered();
     }
 
@@ -186,11 +191,12 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
 
         channel = null;
         buffer.release();
+        rsm.close();
+        rsm = null;
 
         reset();
 
         setState(LifecycleState.CLOSED);
-        rsm.close();
 
         ctx.fireChannelUnregistered();
     }
@@ -205,13 +211,6 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
             channel.config().setAutoRead(true);
         } else if (evt instanceof Reset) {
             reset();
-        } else if (evt instanceof PingBeforeActivate) {
-
-            PingBeforeActivate pba = (PingBeforeActivate) evt;
-
-            stack.addFirst(pba.getCommand());
-            ctx.writeAndFlush(pba.getCommand());
-            return;
         }
 
         super.userEventTriggered(ctx, evt);
@@ -232,7 +231,8 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
             try {
                 command.completeExceptionally(cause);
             } catch (Exception ex) {
-                logger.warn("{} Unexpected exception during command completion exceptionally: {}", logPrefix, ex.toString(), ex);
+                logger.warn("{} Unexpected exception during command completion exceptionally: {}", logPrefix, ex.toString(),
+                        ex);
             }
         }
 
@@ -262,11 +262,6 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
 
-        tracedEndpoint = clientResources.tracing().createEndpoint(ctx.channel().remoteAddress());
-        logPrefix = null;
-        pristine = true;
-        fallbackCommand = null;
-
         if (debugEnabled) {
             logger.debug("{} channelActive()", logPrefix());
         }
@@ -274,12 +269,7 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
         setState(LifecycleState.CONNECTED);
 
         endpoint.notifyChannelActive(ctx.channel());
-
         super.channelActive(ctx);
-
-        if (channel != null) {
-            channel.eventLoop().submit((Runnable) () -> channel.pipeline().fireUserEventTriggered(new Activated()));
-        }
 
         if (debugEnabled) {
             logger.debug("{} channelActive() done", logPrefix());
@@ -327,8 +317,6 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
         if (isProtectedMode(command)) {
             onProtectedMode(command.getOutput().getError());
         }
-
-        rsm.reset();
 
         if (debugEnabled) {
             logger.debug("{} channelInactive() done", logPrefix());
@@ -384,10 +372,10 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
 
         if (tracingEnabled && command instanceof CompleteableCommand) {
 
-            TracedCommand<?, ?, ?> provider = CommandWrapper.unwrap(command, TracedCommand.class);
+            TracedCommand<?, ?, ?> traced = CommandWrapper.unwrap(command, TracedCommand.class);
+            TraceContextProvider provider = (traced == null ? clientResources.tracing().initialTraceContextProvider() : traced);
             Tracer tracer = clientResources.tracing().getTracerProvider().getTracer();
-            TraceContext context = (provider == null ? clientResources.tracing().initialTraceContextProvider() : provider)
-                    .getTraceContext();
+            TraceContext context = provider.getTraceContext();
 
             Tracer.Span span = tracer.nextSpan(context);
             span.name(command.getType().name());
@@ -398,7 +386,10 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
 
             span.remoteEndpoint(tracedEndpoint);
             span.start();
-            provider.setSpan(span);
+
+            if (traced != null) {
+                traced.setSpan(span);
+            }
 
             CompleteableCommand<?> completeableCommand = (CompleteableCommand<?>) command;
             completeableCommand.onComplete((o, throwable) -> {
@@ -429,8 +420,8 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
 
             if (isWriteable(command) && !deduplicated.add(command)) {
                 deduplicated.remove(command);
-                command.completeExceptionally(new RedisException(
-                        "Attempting to write duplicate command that is already enqueued: " + command));
+                command.completeExceptionally(
+                        new RedisException("Attempting to write duplicate command that is already enqueued: " + command));
             }
         }
 
@@ -533,6 +524,7 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 
         ByteBuf input = (ByteBuf) msg;
+        input.touch("CommandHandler.read(…)");
 
         if (!input.isReadable() || input.refCnt() == 0) {
             logger.warn("{} Input not readable {}, {}", logPrefix(), input.isReadable(), input.refCnt());
@@ -558,6 +550,7 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
                 logger.trace("{} Buffer: {}", logPrefix(), input.toString(Charset.defaultCharset()).trim());
             }
 
+            buffer.touch("CommandHandler.read(…)");
             buffer.writeBytes(input);
 
             decode(ctx, buffer);
@@ -777,13 +770,14 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
 
     private void recordLatency(WithLatency withLatency, ProtocolKeyword commandType) {
 
-        if (withLatency != null && clientResources.commandLatencyCollector().isEnabled() && channel != null && remote() != null) {
+        if (withLatency != null && clientResources.commandLatencyCollector().isEnabled() && channel != null
+                && remote() != null) {
 
             long firstResponseLatency = withLatency.getFirstResponse() - withLatency.getSent();
             long completionLatency = nanoTime() - withLatency.getSent();
 
-            clientResources.commandLatencyCollector().recordCommandLatency(local(), remote(), commandType,
-                    firstResponseLatency, completionLatency);
+            clientResources.commandLatencyCollector().recordCommandLatency(local(), remote(), commandType, firstResponseLatency,
+                    completionLatency);
         }
     }
 
@@ -811,7 +805,9 @@ public class CommandHandler extends ChannelDuplexHandler implements HasQueuedCom
 
     private void resetInternals() {
 
-        rsm.reset();
+        if (rsm != null) {
+            rsm.reset();
+        }
 
         if (buffer.refCnt() > 0) {
             buffer.clear();

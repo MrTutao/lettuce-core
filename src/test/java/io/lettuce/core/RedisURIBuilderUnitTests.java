@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,11 +23,15 @@ import java.io.IOException;
 import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 /**
  * Unit tests for {@link RedisURI.Builder}.
  *
  * @author Mark Paluch
+ * @author Guy Korland
  */
 class RedisURIBuilderUnitTests {
 
@@ -109,15 +113,18 @@ class RedisURIBuilderUnitTests {
     void redisFromUrlNoPassword() {
         RedisURI redisURI = RedisURI.create("redis://localhost:1234/5");
         assertThat(redisURI.getPassword()).isNull();
+        assertThat(redisURI.getUsername()).isNull();
 
         redisURI = RedisURI.create("redis://h:@localhost.com:14589");
         assertThat(redisURI.getPassword()).isNull();
+        assertThat(redisURI.getUsername()).isNull();
     }
 
     @Test
     void redisFromUrlPassword() {
         RedisURI redisURI = RedisURI.create("redis://h:password@localhost.com:14589");
         assertThat(redisURI.getPassword()).isEqualTo("password".toCharArray());
+        assertThat(redisURI.getUsername()).isEqualTo("h");
     }
 
     @Test
@@ -138,6 +145,7 @@ class RedisURIBuilderUnitTests {
         assertThat(result.getHost()).isEqualTo("localhost");
         assertThat(result.getPort()).isEqualTo(RedisURI.DEFAULT_REDIS_PORT);
         assertThat(result.getPassword()).isEqualTo("password".toCharArray());
+        assertThat(result.getUsername()).isNull();
         assertThat(result.isSsl()).isTrue();
     }
 
@@ -147,7 +155,7 @@ class RedisURIBuilderUnitTests {
 
         assertThat(result.getSentinels()).hasSize(1);
         assertThat(result.getHost()).isNull();
-        assertThat(result.getPort()).isEqualTo(0);
+        assertThat(result.getPort()).isEqualTo(RedisURI.DEFAULT_REDIS_PORT);
         assertThat(result.getPassword()).isEqualTo("password".toCharArray());
         assertThat(result.getSentinelMasterId()).isEqualTo("master");
         assertThat(result.toString()).contains("master");
@@ -156,7 +164,7 @@ class RedisURIBuilderUnitTests {
 
         assertThat(result.getSentinels()).hasSize(3);
         assertThat(result.getHost()).isNull();
-        assertThat(result.getPort()).isEqualTo(0);
+        assertThat(result.getPort()).isEqualTo(RedisURI.DEFAULT_REDIS_PORT);
         assertThat(result.getPassword()).isEqualTo("password".toCharArray());
         assertThat(result.getSentinelMasterId()).isEqualTo("master");
 
@@ -241,6 +249,7 @@ class RedisURIBuilderUnitTests {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void redisSocket() throws IOException {
         File file = new File("work/socket-6479").getCanonicalFile();
         RedisURI result = RedisURI.create(RedisURI.URI_SCHEME_REDIS_SOCKET + "://" + file.getCanonicalPath());
@@ -249,11 +258,12 @@ class RedisURIBuilderUnitTests {
         assertThat(result.getSentinels()).isEmpty();
         assertThat(result.getPassword()).isNull();
         assertThat(result.getHost()).isNull();
-        assertThat(result.getPort()).isEqualTo(0);
+        assertThat(result.getPort()).isEqualTo(RedisURI.DEFAULT_REDIS_PORT);
         assertThat(result.isSsl()).isFalse();
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void redisSocketWithPassword() throws IOException {
         File file = new File("work/socket-6479").getCanonicalFile();
         RedisURI result = RedisURI.create(RedisURI.URI_SCHEME_REDIS_SOCKET + "://password@" + file.getCanonicalPath());
@@ -262,7 +272,7 @@ class RedisURIBuilderUnitTests {
         assertThat(result.getSentinels()).isEmpty();
         assertThat(result.getPassword()).isEqualTo("password".toCharArray());
         assertThat(result.getHost()).isNull();
-        assertThat(result.getPort()).isEqualTo(0);
+        assertThat(result.getPort()).isEqualTo(RedisURI.DEFAULT_REDIS_PORT);
         assertThat(result.isSsl()).isFalse();
     }
 }

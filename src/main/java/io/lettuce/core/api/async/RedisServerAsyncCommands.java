@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -107,6 +107,14 @@ public interface RedisServerAsyncCommands<K, V> {
     RedisFuture<String> clientList();
 
     /**
+     * Get the id of the current connection.
+     *
+     * @return Long The command just returns the ID of the current connection.
+     * @since 5.3
+     */
+    RedisFuture<Long> clientId();
+
+    /**
      * Returns an array reply of details about all Redis commands.
      *
      * @return List&lt;Object&gt; array-reply
@@ -201,15 +209,11 @@ public interface RedisServerAsyncCommands<K, V> {
 
     /**
      * Make the server crash: Out of memory.
-     *
-     * @return nothing, because the server crashes before returning.
      */
     void debugOom();
 
     /**
      * Make the server crash: Invalid pointer access.
-     *
-     * @return nothing, because the server crashes before returning.
      */
     void debugSegfault();
 

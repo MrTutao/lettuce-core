@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,6 +42,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.DefaultClientResources;
 import io.lettuce.test.Wait;
+import io.lettuce.test.condition.EnabledOnCommand;
 import io.lettuce.test.resource.FastShutdown;
 
 /**
@@ -50,6 +51,7 @@ import io.lettuce.test.resource.FastShutdown;
  * @author Mark Paluch
  * @author Daniel Albuquerque
  */
+@EnabledOnCommand("HELLO")
 class BraveTracingIntegrationTests extends TestSupport {
 
     private static ClientResources clientResources;
@@ -98,8 +100,8 @@ class BraveTracingIntegrationTests extends TestSupport {
 
         List<Span> spans = new ArrayList<>(BraveTracingIntegrationTests.spans);
 
-        assertThat(spans.get(0).name()).isEqualTo("ping");
-        assertThat(spans.get(1).name()).isEqualTo("foo");
+        assertThat(spans.get(0).name()).isEqualTo("hello");
+        assertThat(spans.get(1).name()).isEqualTo("ping");
     }
 
     @Test
@@ -114,17 +116,17 @@ class BraveTracingIntegrationTests extends TestSupport {
         } catch (Exception e) {
         }
 
-        Wait.untilEquals(2, spans::size).waitOrTimeout();
+        Wait.untilTrue(() -> spans.size() > 2).waitOrTimeout();
 
         foo.finish();
 
         List<Span> spans = new ArrayList<>(BraveTracingIntegrationTests.spans);
 
-        assertThat(spans.get(0).name()).isEqualTo("set");
-        assertThat(spans.get(1).name()).isEqualTo("hgetall");
-        assertThat(spans.get(1).tags()).containsEntry("error",
+        assertThat(spans.get(1).name()).isEqualTo("set");
+        assertThat(spans.get(2).name()).isEqualTo("hgetall");
+        assertThat(spans.get(2).tags()).containsEntry("error",
                 "WRONGTYPE Operation against a key holding the wrong kind of value");
-        assertThat(spans.get(2).name()).isEqualTo("foo");
+        assertThat(spans.get(3).name()).isEqualTo("foo");
     }
 
     @Test
@@ -140,17 +142,17 @@ class BraveTracingIntegrationTests extends TestSupport {
         connect.sync().set("foo", "bar");
         connect.sync().get("foo");
 
-        Wait.untilEquals(2, spans::size).waitOrTimeout();
+        Wait.untilTrue(() -> spans.size() > 2).waitOrTimeout();
 
         trace.finish();
 
         List<Span> spans = new ArrayList<>(BraveTracingIntegrationTests.spans);
 
-        assertThat(spans.get(0).name()).isEqualTo("set");
-        assertThat(spans.get(0).tags()).doesNotContainKey("redis.args");
-        assertThat(spans.get(1).name()).isEqualTo("get");
+        assertThat(spans.get(1).name()).isEqualTo("set");
         assertThat(spans.get(1).tags()).doesNotContainKey("redis.args");
-        assertThat(spans.get(2).name()).isEqualTo("foo");
+        assertThat(spans.get(2).name()).isEqualTo("get");
+        assertThat(spans.get(2).tags()).doesNotContainKey("redis.args");
+        assertThat(spans.get(3).name()).isEqualTo("foo");
 
         FastShutdown.shutdown(client);
         FastShutdown.shutdown(clientResources);
@@ -183,8 +185,8 @@ class BraveTracingIntegrationTests extends TestSupport {
 
         List<Span> spans = new ArrayList<>(BraveTracingIntegrationTests.spans);
 
-        assertThat(spans.get(0).name()).isEqualTo("ping");
-        assertThat(spans.get(1).name()).isEqualTo("foo");
+        assertThat(spans.get(1).name()).isEqualTo("ping");
+        assertThat(spans.get(2).name()).isEqualTo("foo");
     }
 
     @Test
@@ -199,17 +201,17 @@ class BraveTracingIntegrationTests extends TestSupport {
                 .as(StepVerifier::create) //
                 .expectNext("bar").verifyComplete();
 
-        Wait.untilEquals(2, spans::size).waitOrTimeout();
+        Wait.untilTrue(() -> spans.size() > 2).waitOrTimeout();
 
         trace.finish();
 
         List<Span> spans = new ArrayList<>(BraveTracingIntegrationTests.spans);
 
-        assertThat(spans.get(0).name()).isEqualTo("set");
-        assertThat(spans.get(0).tags()).containsEntry("redis.args", "key<foo> value<bar>");
-        assertThat(spans.get(1).name()).isEqualTo("get");
-        assertThat(spans.get(1).tags()).containsEntry("redis.args", "key<foo>");
-        assertThat(spans.get(2).name()).isEqualTo("foo");
+        assertThat(spans.get(1).name()).isEqualTo("set");
+        assertThat(spans.get(1).tags()).containsEntry("redis.args", "key<foo> value<bar>");
+        assertThat(spans.get(2).name()).isEqualTo("get");
+        assertThat(spans.get(2).tags()).containsEntry("redis.args", "key<foo>");
+        assertThat(spans.get(3).name()).isEqualTo("foo");
     }
 
     @Test
@@ -218,22 +220,19 @@ class BraveTracingIntegrationTests extends TestSupport {
         brave.Span trace = clientTracing.tracer().newTrace();
 
         StatefulRedisConnection<String, String> connect = client.connect();
-        connect.reactive()
-                .set("foo", "bar")
-                .then(connect.reactive().get("foo"))
-                .subscriberContext(
-                        io.lettuce.core.tracing.Tracing.withTraceContextProvider(() -> BraveTracing.BraveTraceContext
-                                .create(trace.context()))) //
+        connect.reactive().set("foo", "bar").then(connect.reactive().get("foo"))
+                .subscriberContext(io.lettuce.core.tracing.Tracing
+                        .withTraceContextProvider(() -> BraveTracing.BraveTraceContext.create(trace.context()))) //
                 .as(StepVerifier::create) //
                 .expectNext("bar").verifyComplete();
 
-        Wait.untilEquals(2, spans::size).waitOrTimeout();
+        Wait.untilTrue(() -> spans.size() > 2).waitOrTimeout();
 
         trace.finish();
 
         List<Span> spans = new ArrayList<>(BraveTracingIntegrationTests.spans);
 
-        assertThat(spans.get(0).name()).isEqualTo("set");
-        assertThat(spans.get(1).name()).isEqualTo("get");
+        assertThat(spans.get(1).name()).isEqualTo("set");
+        assertThat(spans.get(2).name()).isEqualTo("get");
     }
 }

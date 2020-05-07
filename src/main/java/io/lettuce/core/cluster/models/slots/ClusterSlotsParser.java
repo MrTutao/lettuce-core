@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -81,7 +81,7 @@ public class ClusterSlotsParser {
         List<RedisClusterNode> replicas = new ArrayList<>();
         if (iterator.hasNext()) {
             master = getRedisClusterNode(iterator, nodeCache);
-            if(master != null) {
+            if (master != null) {
                 master.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.MASTER));
                 Set<Integer> slots = new TreeSet<>(master.getSlots());
                 slots.addAll(createSlots(from, to));
@@ -91,7 +91,7 @@ public class ClusterSlotsParser {
 
         while (iterator.hasNext()) {
             RedisClusterNode replica = getRedisClusterNode(iterator, nodeCache);
-            if (replica != null) {
+            if (replica != null && master != null) {
                 replica.setSlaveOf(master.getNodeId());
                 replica.setFlags(Collections.singleton(RedisClusterNode.NodeFlag.SLAVE));
                 replicas.add(replica);
@@ -123,21 +123,19 @@ public class ClusterSlotsParser {
             int port = Math.toIntExact(getLongFromIterator(hostAndPortIterator, 0));
             String nodeId;
 
-
             if (hostAndPortIterator.hasNext()) {
                 nodeId = (String) hostAndPortIterator.next();
 
                 redisClusterNode = nodeCache.get(nodeId);
-                if(redisClusterNode == null) {
+                if (redisClusterNode == null) {
                     redisClusterNode = createNode(host, port);
                     nodeCache.put(nodeId, redisClusterNode);
                     redisClusterNode.setNodeId(nodeId);
                 }
-            }
-            else {
+            } else {
                 String key = host + ":" + port;
                 redisClusterNode = nodeCache.get(key);
-                if(redisClusterNode == null) {
+                if (redisClusterNode == null) {
                     redisClusterNode = createNode(host, port);
                     nodeCache.put(key, redisClusterNode);
                 }

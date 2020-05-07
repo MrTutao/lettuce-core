@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2019 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,10 +37,10 @@ import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
  * subscription.
  *
  * <pre class="code">
- *  StatefulRedisClusterPubSubConnection<String, String> connection = clusterClient.connectPubSub();
+ *  StatefulRedisClusterPubSubConnection&lt;String, String&gt; connection = clusterClient.connectPubSub();
  *  connection.addListener(…);
  *
- *  RedisClusterPubSubCommands<String, String> sync = connection.sync();
+ *  RedisClusterPubSubCommands&lt;String, String&gt; sync = connection.sync();
  *  sync.subscribe("channel");
  *  sync.publish("channel", "message");
  * </pre>
@@ -59,10 +59,10 @@ import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
  *
  * <pre>
  *     <code>
- *  StatefulRedisClusterPubSubConnection<String, String> connection = clusterClient.connectPubSub();
+ *  StatefulRedisClusterPubSubConnection&lt;String, String&gt; connection = clusterClient.connectPubSub();
  *  connection.addListener(…);
  *
- *  RedisClusterPubSubCommands<String, String> sync = connection.sync();
+ *  RedisClusterPubSubCommands&lt;String, String&gt; sync = connection.sync();
  *  sync.replicas().commands().psubscribe("__key*__:*");
  *     </code>
  * </pre>

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -99,18 +99,6 @@ public abstract class RedisChannelHandler<K, V> implements Closeable, Connection
         if (channelWriter instanceof CommandExpiryWriter) {
             ((CommandExpiryWriter) channelWriter).setTimeout(timeout);
         }
-    }
-
-    /**
-     * Set the command timeout for this connection.
-     *
-     * @param timeout Command timeout.
-     * @param unit Unit of time for the timeout.
-     * @deprecated since 5.0, use {@link #setTimeout(Duration)}
-     */
-    @Deprecated
-    public void setTimeout(long timeout, TimeUnit unit) {
-        setTimeout(Duration.ofNanos(unit.toNanos(timeout)));
     }
 
     /**

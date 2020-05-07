@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,7 +44,8 @@ public class TopologyComparators {
      * @return List containing {@link RedisClusterNode}s ordered by {@code fixedOrder} and {@link RedisURI}
      * @see #sortByUri(Iterable)
      */
-    public static List<RedisClusterNode> predefinedSort(Iterable<RedisClusterNode> clusterNodes, Iterable<RedisURI> fixedOrder) {
+    public static List<RedisClusterNode> predefinedSort(Iterable<RedisClusterNode> clusterNodes,
+            Iterable<RedisURI> fixedOrder) {
 
         LettuceAssert.notNull(clusterNodes, "Cluster nodes must not be null");
         LettuceAssert.notNull(fixedOrder, "Fixed order must not be null");
@@ -60,8 +61,8 @@ public class TopologyComparators {
                 .filter(redisClusterNode -> !fixedOrderList.contains(redisClusterNode.getUri()))//
                 .collect(Collectors.toList());
 
-        Collections.sort(withOrderSpecification, new PredefinedRedisClusterNodeComparator(fixedOrderList));
-        Collections.sort(withoutSpecification, (o1, o2) -> RedisURIComparator.INSTANCE.compare(o1.getUri(), o2.getUri()));
+        withOrderSpecification.sort(new PredefinedRedisClusterNodeComparator(fixedOrderList));
+        withoutSpecification.sort((o1, o2) -> RedisURIComparator.INSTANCE.compare(o1.getUri(), o2.getUri()));
 
         withOrderSpecification.addAll(withoutSpecification);
 

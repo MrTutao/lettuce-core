@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,8 +22,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.lettuce.core.RedisCommandInterruptedException;
-import io.lettuce.core.RedisException;
 import io.lettuce.core.RedisFuture;
+import io.lettuce.core.internal.Exceptions;
 
 /**
  * Utility to perform and synchronize command executions on multiple cluster nodes.
@@ -35,11 +35,8 @@ class MultiNodeExecution {
     static <T> T execute(Callable<T> function) {
         try {
             return function.call();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RedisCommandInterruptedException(e);
         } catch (Exception e) {
-            throw new RedisException(e);
+            throw Exceptions.bubble(e);
         }
     }
 
@@ -75,14 +72,14 @@ class MultiNodeExecution {
 
         return new PipelinedRedisFuture<>(executions, objectPipelinedRedisFuture -> {
             // make sure, that all futures are executed before returning the result.
-                for (CompletionStage<T> future : executions.values()) {
-                    execute(() -> future.toCompletableFuture().get());
-                }
-                for (CompletionStage<T> future : executions.values()) {
-                    return execute(() -> future.toCompletableFuture().get());
-                }
-                return null;
-            });
+            for (CompletionStage<T> future : executions.values()) {
+                execute(() -> future.toCompletableFuture().get());
+            }
+            for (CompletionStage<T> future : executions.values()) {
+                return execute(() -> future.toCompletableFuture().get());
+            }
+            return null;
+        });
     }
 
     /**
@@ -96,12 +93,12 @@ class MultiNodeExecution {
 
         return new PipelinedRedisFuture<>(executions, objectPipelinedRedisFuture -> {
             // make sure, that all futures are executed before returning the result.
-                T result = null;
-                for (CompletionStage<T> future : executions.values()) {
-                    result = execute(() -> future.toCompletableFuture().get());
-                }
-                return result;
-            });
+            T result = null;
+            for (CompletionStage<T> future : executions.values()) {
+                result = execute(() -> future.toCompletableFuture().get());
+            }
+            return result;
+        });
     }
 
     /**

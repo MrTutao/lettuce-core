@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2019 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,10 +41,15 @@ import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
 
 /**
+ * An asynchronous and thread-safe API for a Redis pub/sub connection.
+ *
+ * @param <K> Key type.
+ * @param <V> Value type.
  * @author Mark Paluch
+ * @since 5.0
  */
-class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommandsImpl<K, V> implements
-        RedisClusterPubSubAsyncCommands<K, V> {
+public class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommandsImpl<K, V>
+        implements RedisClusterPubSubAsyncCommands<K, V> {
 
     /**
      * Initialize a new connection.
@@ -52,14 +57,14 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
      * @param connection the connection .
      * @param codec Codec used to encode/decode keys and values.
      */
-    public RedisClusterPubSubAsyncCommandsImpl(StatefulRedisClusterPubSubConnection<K, V> connection, RedisCodec<K, V> codec) {
+    public RedisClusterPubSubAsyncCommandsImpl(StatefulRedisPubSubConnection<K, V> connection, RedisCodec<K, V> codec) {
         super(connection, codec);
     }
 
     @Override
     public RedisFuture<Set<V>> georadius(K key, double longitude, double latitude, double distance, GeoArgs.Unit unit) {
 
-        if (getStatefulConnection().getState().hasCommand(CommandType.GEORADIUS_RO)) {
+        if (getStatefulConnection().getCommandSet().hasCommand(CommandType.GEORADIUS_RO)) {
             return super.georadius_ro(key, longitude, latitude, distance, unit);
         }
 
@@ -70,7 +75,7 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
     public RedisFuture<List<GeoWithin<V>>> georadius(K key, double longitude, double latitude, double distance,
             GeoArgs.Unit unit, GeoArgs geoArgs) {
 
-        if (getStatefulConnection().getState().hasCommand(CommandType.GEORADIUS_RO)) {
+        if (getStatefulConnection().getCommandSet().hasCommand(CommandType.GEORADIUS_RO)) {
             return super.georadius_ro(key, longitude, latitude, distance, unit, geoArgs);
         }
 
@@ -80,7 +85,7 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
     @Override
     public RedisFuture<Set<V>> georadiusbymember(K key, V member, double distance, GeoArgs.Unit unit) {
 
-        if (getStatefulConnection().getState().hasCommand(CommandType.GEORADIUSBYMEMBER_RO)) {
+        if (getStatefulConnection().getCommandSet().hasCommand(CommandType.GEORADIUSBYMEMBER_RO)) {
             return super.georadiusbymember_ro(key, member, distance, unit);
         }
 
@@ -91,7 +96,7 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
     public RedisFuture<List<GeoWithin<V>>> georadiusbymember(K key, V member, double distance, GeoArgs.Unit unit,
             GeoArgs geoArgs) {
 
-        if (getStatefulConnection().getState().hasCommand(CommandType.GEORADIUSBYMEMBER_RO)) {
+        if (getStatefulConnection().getCommandSet().hasCommand(CommandType.GEORADIUSBYMEMBER_RO)) {
             return super.georadiusbymember_ro(key, member, distance, unit, geoArgs);
         }
 
@@ -115,9 +120,9 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
                 new Class<?>[] { NodeSelectionPubSubAsyncCommands.class, PubSubAsyncNodeSelection.class }, h);
     }
 
-    private static class StaticPubSubAsyncNodeSelection<K, V> extends
-            AbstractNodeSelection<RedisPubSubAsyncCommands<K, V>, NodeSelectionPubSubAsyncCommands<K, V>, K, V> implements
-            PubSubAsyncNodeSelection<K, V> {
+    private static class StaticPubSubAsyncNodeSelection<K, V>
+            extends AbstractNodeSelection<RedisPubSubAsyncCommands<K, V>, NodeSelectionPubSubAsyncCommands<K, V>, K, V>
+            implements PubSubAsyncNodeSelection<K, V> {
 
         private final List<RedisClusterNode> redisClusterNodes;
         private final ClusterDistributionChannelWriter writer;
@@ -126,7 +131,7 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
         public StaticPubSubAsyncNodeSelection(StatefulRedisClusterPubSubConnection<K, V> globalConnection,
                 Predicate<RedisClusterNode> selector) {
 
-            this.redisClusterNodes = globalConnection.getPartitions().getPartitions().stream().filter(selector)
+            this.redisClusterNodes = globalConnection.getPartitions().stream().filter(selector)
                     .collect(Collectors.toList());
             writer = ((StatefulRedisClusterPubSubConnectionImpl) globalConnection).getClusterDistributionChannelWriter();
         }
@@ -146,8 +151,8 @@ class RedisClusterPubSubAsyncCommandsImpl<K, V> extends RedisPubSubAsyncCommands
             RedisURI uri = redisClusterNode.getUri();
             AsyncClusterConnectionProvider async = (AsyncClusterConnectionProvider) writer.getClusterConnectionProvider();
 
-            return async.getConnectionAsync(ClusterConnectionProvider.Intent.WRITE, uri.getHost(), uri.getPort()).thenApply(
-                    it -> (StatefulRedisPubSubConnection<K, V>) it);
+            return async.getConnectionAsync(ClusterConnectionProvider.Intent.WRITE, uri.getHost(), uri.getPort())
+                    .thenApply(it -> (StatefulRedisPubSubConnection<K, V>) it);
         }
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.DefaultClientResources;
 import io.lettuce.core.resource.DefaultEventLoopGroupProvider;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.Wait;
 import io.lettuce.test.resource.FastShutdown;
 import io.lettuce.test.resource.TestClientResources;
@@ -119,7 +119,7 @@ class RedisClientIntegrationTests extends TestSupport {
         // then
         connectAndClose(redisClient2);
 
-        Futures.await(clientResources.shutdown(0, 0, TimeUnit.MILLISECONDS));
+        TestFutures.awaitOrTimeout(clientResources.shutdown(0, 0, TimeUnit.MILLISECONDS));
 
         assertThat(eventLoopGroups).isEmpty();
         assertThat(executor.isShuttingDown()).isTrue();
@@ -152,7 +152,7 @@ class RedisClientIntegrationTests extends TestSupport {
         assertThat(clientResources.eventExecutorGroup().isShuttingDown()).isFalse();
 
         // cleanup
-        Futures.await(clientResources.shutdown(0, 0, TimeUnit.MILLISECONDS));
+        TestFutures.awaitOrTimeout(clientResources.shutdown(0, 0, TimeUnit.MILLISECONDS));
         assertThat(clientResources.eventExecutorGroup().isShuttingDown()).isTrue();
     }
 

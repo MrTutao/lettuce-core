@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,15 +16,12 @@
 package io.lettuce.core.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -49,7 +46,7 @@ import edu.umd.cs.mtc.MultithreadedTestCase;
 import edu.umd.cs.mtc.TestFramework;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisException;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.LettuceFactories;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.resource.ClientResources;
@@ -69,8 +66,8 @@ class DefaultEndpointUnitTests {
 
     private DefaultEndpoint sut;
 
-    private final Command<String, String, String> command = new Command<>(CommandType.APPEND, new StatusOutput<>(
-            new Utf8StringCodec()), null);
+    private final Command<String, String, String> command = new Command<>(CommandType.APPEND,
+            new StatusOutput<>(StringCodec.UTF8), null);
 
     @Mock
     private Channel channel;
@@ -224,7 +221,6 @@ class DefaultEndpointUnitTests {
 
         verify(channel).write(command);
         verify(channel).flush();
-
     }
 
     @Test
@@ -260,12 +256,8 @@ class DefaultEndpointUnitTests {
                 .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS) //
                 .build(), clientResources);
 
-        try {
-            sut.write(command);
-            fail("Missing RedisException");
-        } catch (RedisException e) {
-            assertThat(e).hasMessageContaining("Commands are rejected");
-        }
+        sut.write(command);
+        assertThat(command.exception).hasMessageContaining("Commands are rejected");
     }
 
     @Test
@@ -273,12 +265,8 @@ class DefaultEndpointUnitTests {
 
         sut.close();
 
-        try {
-            sut.write(command);
-            fail("Missing RedisException");
-        } catch (RedisException e) {
-            assertThat(e).hasMessageContaining("Connection is closed");
-        }
+        sut.write(command);
+        assertThat(command.exception).hasMessageContaining("Connection is closed");
     }
 
     @Test
@@ -289,12 +277,8 @@ class DefaultEndpointUnitTests {
                 .disconnectedBehavior(ClientOptions.DisconnectedBehavior.DEFAULT) //
                 .build(), clientResources);
 
-        try {
-            sut.write(command);
-            fail("Missing RedisException");
-        } catch (RedisException e) {
-            assertThat(e).hasMessageContaining("Commands are rejected");
-        }
+        sut.write(command);
+        assertThat(command.exception).hasMessageContaining("Commands are rejected");
     }
 
     @Test
@@ -369,6 +353,68 @@ class DefaultEndpointUnitTests {
         listener.operationComplete(promise);
 
         verify(channel, never()).writeAndFlush(command);
+    }
+
+    @Test
+    void shouldWrapActivationCommands() {
+
+        when(channel.isActive()).thenReturn(true);
+        doAnswer(i -> {
+
+            sut.write(new Command<>(CommandType.AUTH, new StatusOutput<>(StringCodec.UTF8)));
+            sut.write(Collections.singletonList(new Command<>(CommandType.SELECT, new StatusOutput<>(StringCodec.UTF8))));
+            return null;
+        }).when(connectionFacade).activated();
+
+        sut.notifyChannelActive(channel);
+
+        DefaultChannelPromise promise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
+
+        when(channel.writeAndFlush(any())).thenAnswer(invocation -> {
+            if (invocation.getArguments()[0] instanceof RedisCommand) {
+                queue.add((RedisCommand) invocation.getArguments()[0]);
+            }
+
+            if (invocation.getArguments()[0] instanceof Collection) {
+                queue.addAll((Collection) invocation.getArguments()[0]);
+            }
+            return promise;
+        });
+
+        assertThat(queue).hasSize(2).hasOnlyElementsOfTypes(DefaultEndpoint.ActivationCommand.class);
+    }
+
+    @Test
+    void shouldNotReplayActivationCommands() {
+
+        when(channel.isActive()).thenReturn(true);
+        ConnectionTestUtil.getDisconnectedBuffer(sut).add(new DefaultEndpoint.ActivationCommand<>(
+                new Command<>(CommandType.SELECT, new StatusOutput<>(StringCodec.UTF8))));
+        ConnectionTestUtil.getDisconnectedBuffer(sut).add(new LatencyMeteredCommand<>(new DefaultEndpoint.ActivationCommand<>(
+                new Command<>(CommandType.SUBSCRIBE, new StatusOutput<>(StringCodec.UTF8)))));
+
+        doAnswer(i -> {
+
+            sut.write(new Command<>(CommandType.AUTH, new StatusOutput<>(StringCodec.UTF8)));
+            return null;
+        }).when(connectionFacade).activated();
+
+        sut.notifyChannelActive(channel);
+
+        DefaultChannelPromise promise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
+
+        when(channel.writeAndFlush(any())).thenAnswer(invocation -> {
+            if (invocation.getArguments()[0] instanceof RedisCommand) {
+                queue.add((RedisCommand) invocation.getArguments()[0]);
+            }
+
+            if (invocation.getArguments()[0] instanceof Collection) {
+                queue.addAll((Collection) invocation.getArguments()[0]);
+            }
+            return promise;
+        });
+
+        assertThat(queue).hasSize(1).extracting(RedisCommand::getType).containsOnly(CommandType.AUTH);
     }
 
     @Test

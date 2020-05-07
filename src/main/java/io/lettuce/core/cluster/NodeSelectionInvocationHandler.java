@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,16 +25,12 @@ import java.util.stream.Collectors;
 
 import org.reactivestreams.Publisher;
 
-import io.lettuce.core.ExceptionFactory;
 import io.lettuce.core.RedisCommandExecutionException;
-import io.lettuce.core.RedisCommandInterruptedException;
 import io.lettuce.core.RedisCommandTimeoutException;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.api.NodeSelectionSupport;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
-import io.lettuce.core.internal.AbstractInvocationHandler;
-import io.lettuce.core.internal.LettuceAssert;
-import io.lettuce.core.internal.TimeoutProvider;
+import io.lettuce.core.internal.*;
 import io.lettuce.core.protocol.RedisCommand;
 
 /**
@@ -123,8 +119,8 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
 
                     try {
 
-                        Object resultValue = targetMethod.invoke(
-                                executionModel == ExecutionModel.REACTIVE ? it.reactive() : it.async(), args);
+                        Object resultValue = targetMethod
+                                .invoke(executionModel == ExecutionModel.REACTIVE ? it.reactive() : it.async(), args);
 
                         if (timeoutProvider != null && resultValue instanceof RedisCommand && timeout.get() == 0) {
                             timeout.set(timeoutProvider.getTimeoutNs((RedisCommand) resultValue));
@@ -158,8 +154,8 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
     }
 
     @SuppressWarnings("unchecked")
-    private Object getExecutions(Map<RedisClusterNode, Object> executions, long timeoutNs) throws ExecutionException,
-            InterruptedException {
+    private Object getExecutions(Map<RedisClusterNode, Object> executions, long timeoutNs)
+            throws ExecutionException, InterruptedException {
 
         if (executionModel == ExecutionModel.REACTIVE) {
             Map<RedisClusterNode, CompletionStage<? extends Publisher<?>>> reactiveExecutions = (Map) executions;
@@ -170,7 +166,7 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
 
         if (executionModel == ExecutionModel.SYNC) {
 
-            long timeoutToUse = timeoutNs > 0 ? timeoutNs : timeoutProvider.getTimeoutNs(null);
+            long timeoutToUse = timeoutNs >= 0 ? timeoutNs : timeoutProvider.getTimeoutNs(null);
 
             if (!awaitAll(timeoutToUse, TimeUnit.NANOSECONDS, asyncExecutions.values())) {
                 throw createTimeoutException(asyncExecutions, Duration.ofNanos(timeoutToUse));
@@ -195,24 +191,28 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
             long time = System.nanoTime();
 
             for (CompletionStage<?> f : futures) {
-                if (nanos < 0) {
-                    return false;
-                }
-                try {
-                    f.toCompletableFuture().get(nanos, TimeUnit.NANOSECONDS);
-                } catch (ExecutionException e) {
-                    // ignore
-                }
-                long now = System.nanoTime();
-                nanos -= now - time;
-                time = now;
-            }
 
+                if (nanos == 0) {
+                    f.toCompletableFuture().get();
+                } else {
+                    if (nanos < 0) {
+                        return false;
+                    }
+                    try {
+                        f.toCompletableFuture().get(nanos, TimeUnit.NANOSECONDS);
+                    } catch (ExecutionException e) {
+                        // ignore
+                    }
+                    long now = System.nanoTime();
+                    nanos -= now - time;
+                    time = now;
+                }
+            }
             complete = true;
         } catch (TimeoutException e) {
             complete = false;
         } catch (Exception e) {
-            throw new RedisCommandInterruptedException(e);
+            throw Exceptions.bubble(e);
         }
 
         return complete;

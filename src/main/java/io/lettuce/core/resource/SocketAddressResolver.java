@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -81,7 +81,7 @@ public class SocketAddressResolver {
     public static SocketAddress resolve(RedisURI redisURI, DnsResolver dnsResolver) {
 
         if (redisURI.getSocket() != null) {
-            return redisURI.getResolvedAddress();
+            return getDomainSocketAddress(redisURI);
         }
 
         try {
@@ -93,7 +93,19 @@ public class SocketAddressResolver {
 
             return new InetSocketAddress(inetAddress[0], redisURI.getPort());
         } catch (UnknownHostException e) {
-            return redisURI.getResolvedAddress();
+            return new InetSocketAddress(redisURI.getHost(), redisURI.getPort());
         }
+    }
+
+    static SocketAddress getDomainSocketAddress(RedisURI redisURI) {
+
+        if (KqueueProvider.isAvailable() || EpollProvider.isAvailable()) {
+            EventLoopResources resources = KqueueProvider.isAvailable() ? KqueueProvider.getResources()
+                    : EpollProvider.getResources();
+            return resources.newSocketAddress(redisURI.getSocket());
+        }
+
+        throw new IllegalStateException(
+                "No native transport available. Make sure that either netty's epoll or kqueue library is on the class path and supported by your operating system.");
     }
 }

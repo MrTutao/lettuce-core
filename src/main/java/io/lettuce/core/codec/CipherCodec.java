@@ -1,11 +1,11 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,9 +29,16 @@ import io.netty.buffer.ByteBuf;
  * A crypto {@link RedisCodec} that that allows transparent encryption/decryption of values. This codec uses {@link Cipher}
  * instances provided by {@link CipherSupplier} to process encryption and decryption.
  * <p/>
- * This codec supports various keys by encoding the key name and used key version in the value that is stored in Redis.
- * Decryption decodes the key name and requests a {@link Cipher} from {@link CipherSupplier} to decrypt values with an
- * appropriate key/{@link Cipher}.
+ * This codec supports various encryption keys by encoding the key name and used key version in the value that is stored in
+ * Redis. The message format for encryption is:
+ *
+ * <pre class="code">
+ *     $&lt;key name&gt;+&lt;key version&gt;$&lt;cipher text&gt;
+ * </pre>
+ *
+ * Each value is prefixed with the key message that is enclosed with dollar ({@code $}) signs and using the plus sign
+ * ({@code +}) to denote the key version. Decryption decodes the key name and requests a {@link Cipher} from
+ * {@link CipherSupplier} to decrypt values with an appropriate key/{@link Cipher}.
  * <p/>
  * This {@link RedisCodec codec} does not provide re-wrapping or key rotation features.
  *
@@ -154,8 +161,8 @@ public abstract class CipherCodec {
                 KeyDescriptor keyDescriptor = this.encrypt.encryptionKey();
                 Cipher cipher = this.encrypt.get(keyDescriptor);
 
-                ByteBuffer intermediate = ByteBuffer.allocate(cipher.getOutputSize(serialized.remaining() + 3
-                        + keyDescriptor.name.length + 10));
+                ByteBuffer intermediate = ByteBuffer
+                        .allocate(cipher.getOutputSize(serialized.remaining() + 3 + keyDescriptor.name.length + 10));
 
                 keyDescriptor.writeTo(intermediate);
                 intermediate.put(doWithCipher(cipher, serialized));
@@ -239,8 +246,8 @@ public abstract class CipherCodec {
 
             for (byte b : name) {
                 if (b == '+' || b == '$') {
-                    throw new IllegalArgumentException(String.format(
-                            "Key name %s must not contain plus (+) or dollar ($) characters", new String(name)));
+                    throw new IllegalArgumentException(
+                            String.format("Key name %s must not contain plus (+) or dollar ($) characters", new String(name)));
                 }
             }
             this.name = name;

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,16 @@
  */
 package io.lettuce.core.protocol;
 
-import static io.lettuce.core.protocol.LettuceCharsets.buffer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.lettuce.core.RedisException;
-import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.output.CommandOutput;
 import io.lettuce.core.output.StatusOutput;
 
@@ -34,13 +34,12 @@ import io.lettuce.core.output.StatusOutput;
  */
 public class CommandUnitTests {
 
-    private RedisCodec<String, String> codec = new Utf8StringCodec();
     private Command<String, String, String> sut;
 
     @BeforeEach
     void createCommand() {
 
-        CommandOutput<String, String, String> output = new StatusOutput<>(codec);
+        CommandOutput<String, String, String> output = new StatusOutput<>(StringCodec.UTF8);
         sut = new Command<>(CommandType.INFO, output, null);
     }
 
@@ -71,7 +70,7 @@ public class CommandUnitTests {
     @Test
     void get() {
         assertThat(sut.get()).isNull();
-        sut.getOutput().set(buffer("one"));
+        sut.getOutput().set(StandardCharsets.US_ASCII.encode("one"));
         assertThat(sut.get()).isEqualTo("one");
     }
 
@@ -84,7 +83,7 @@ public class CommandUnitTests {
     @Test
     void setOutputAfterCompleted() {
         sut.complete();
-        assertThatThrownBy(() -> sut.setOutput(new StatusOutput<>(codec))).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> sut.setOutput(new StatusOutput<>(StringCodec.UTF8))).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -96,21 +95,21 @@ public class CommandUnitTests {
     void customKeyword() {
 
         sut = new Command<>(MyKeywords.DUMMY, null, null);
-        sut.setOutput(new StatusOutput<>(codec));
+        sut.setOutput(new StatusOutput<>(StringCodec.UTF8));
 
         assertThat(sut.toString()).contains(MyKeywords.DUMMY.name());
     }
 
     @Test
     void customKeywordWithArgs() {
-        sut = new Command<>(MyKeywords.DUMMY, null, new CommandArgs<>(codec));
+        sut = new Command<>(MyKeywords.DUMMY, null, new CommandArgs<>(StringCodec.UTF8));
         sut.getArgs().add(MyKeywords.DUMMY);
         assertThat(sut.getArgs().toString()).contains(MyKeywords.DUMMY.name());
     }
 
     @Test
     void getWithTimeout() {
-        sut.getOutput().set(buffer("one"));
+        sut.getOutput().set(StandardCharsets.US_ASCII.encode("one"));
         sut.complete();
 
         assertThat(sut.get()).isEqualTo("one");
@@ -118,7 +117,7 @@ public class CommandUnitTests {
 
     @Test
     void outputSubclassOverride1() {
-        CommandOutput<String, String, String> output = new CommandOutput<String, String, String>(codec, null) {
+        CommandOutput<String, String, String> output = new CommandOutput<String, String, String>(StringCodec.UTF8, null) {
             @Override
             public String get() throws RedisException {
                 return null;
@@ -129,7 +128,7 @@ public class CommandUnitTests {
 
     @Test
     void outputSubclassOverride2() {
-        CommandOutput<String, String, String> output = new CommandOutput<String, String, String>(codec, null) {
+        CommandOutput<String, String, String> output = new CommandOutput<String, String, String>(StringCodec.UTF8, null) {
             @Override
             public String get() throws RedisException {
                 return null;

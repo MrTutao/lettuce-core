@@ -1,350 +1,165 @@
-Lettuce 5.1.0 RELEASE NOTES
-===========================
+Lettuce 6.0.0 M1 RELEASE NOTES
+==============================
 
-The Lettuce team is pleased to announce the Lettuce 5.1.0 release! 
-This release contains new features, bugfixes, and enhancements.
- 
-Most notable changes are:
+The Lettuce team is delighted to announce the availability of the first Lettuce 6 milestone.
 
-* Support for Redis Streams
-* Asynchronous pool implementation
-* `SCAN` streams, and initial 
-* Global command timeouts (disabled by default)
-* Asynchronous connect methods for Master/Replica and Sentinel
-* Brave (OpenZipkin) tracing support
-* Lettuce build is now Java 11 compatible
+Lettuce 6 aligns with Redis 6 in terms of API and protocol changes. Both protocols, RESP and RESP3 are supported side-by-side defaulting to RESP.
 
-We started efforts to adapt improvements in Redis terminology about Master/Replica 
-with this release. This release ships documentation changes referring to the 
-existing API as Master/Replica where possible.
+Most notable changes that ship with this release are
 
-We will introduce with the upcoming releases support for the new API methods 
-(`REPLICAOF`) without breaking the public API. Expect breaking changes in a much 
-later release which gives plenty of time to upgrade. 
+* RESP3 support
+* ACL Authentication with username/password
+* Asynchronous Cluster Topology Refresh
+* API cleanups/Breaking Changes
 
-Find the full change log at the end of this document that lists all 108 tickets.
+We're working towards the next milestone and looking at further Redis 6 features such as client-side caching how these can be incorporated into Lettuce. The release date of Lettuce 6 depends on Redis 6 availability. 
 
-Thanks to all contributors who made Lettuce 5.1.0.RELEASE possible.
-
-Lettuce requires a minimum of Java 8 to build and run and is compatible with Java 11. It is tested continuously against the latest Redis source-build.
+Thanks to all contributors who made Lettuce 6.0.0.M1 possible.
+Lettuce requires a minimum of Java 8 to build and run and is compatible with Java 14. It is tested continuously against the latest Redis source-build.
 
 If you need any support, meet Lettuce at
 
-* Google Group (General discussion, announcements and releases): https://groups.google.com/d/forum/lettuce-redis-client-users
+* Google Group (General discussion, announcements, and releases): https://groups.google.com/d/forum/lettuce-redis-client-users
 or lettuce-redis-client-users@googlegroups.com
 * Stack Overflow (Questions): https://stackoverflow.com/questions/tagged/lettuce
 * Join the chat at https://gitter.im/lettuce-io/Lobby for general discussion
 * GitHub Issues (Bug reports, feature requests): https://github.com/lettuce-io/lettuce-core/issues
-* Documentation: https://lettuce.io/core/5.1.0.RELEASE/reference/
-* Javadoc: https://lettuce.io/core/5.1.0.RELEASE/api/
+* Documentation: https://lettuce.io/core/6.0.0.M1/reference/
+* Javadoc: https://lettuce.io/core/6.0.0.M1/api/
 
+RESP3 Support
+-------------
 
-New Exceptions for Redis Responses
-----------------------------------
+Redis 6 ships with support for a new protocol version. RESP3 brings support for additional data types to distinguish better between responses. The following response types were introduced with RESP3:
 
-This release introduces new Exception types for the following Redis responses:
+* Null: a single `null` value replacing RESP v2 `*-1` and `$-1` null values.
+* Double: a floating-point number.
+* Boolean: `true` or `false`.
+* Blob error: binary-safe error code and message.
+* Verbatim string: a binary-safe string that is typically used as user message without any escaping or filtering.
+* Map: an ordered collection of key-value pairs. Keys and values can be any other RESP3 type.
+* Set: an unordered collection of N other types.
+* Attribute: Like the Map type, but the client should keep reading the reply ignoring the attribute type, and return it to the client as additional information.
+* Push: Out-of-band data.
+* Streamed strings: A large response using chunked transfer.
+* Hello: Like the Map type, but is sent only when the connection between the client and the server is established, in order to welcome the client with different information like the name of the server, its version, and so forth.
+* Big number: a large number non-representable by the Number type
 
-* `LOADING`: `RedisLoadingException`
-* `NOSCRIPT`: `RedisNoScriptException`
-* `BUSY`: `RedisBusyException`
+Lettuce supports all response types except attributes. Push messages are only supported for Pub/Sub messages.
 
-All exception types derive from `RedisCommandExecutionException` and do not 
-require changes in application code.
-
-
-Redis Streams
------------------------
-Redis 5.0 is going to ship with support for a Stream data structure. 
-A stream is a log of events that can be consumed sequentially. A Stream 
-message consists of an id and a body represented as hash (or `Map<K, V>`).
-
-Lettuce provides access to Stream commands through `RedisStreamCommands` supporting
-synchronous, asynchronous, and reactive execution models. All Stream commands
-are prefixed with `X` (`XADD`, `XREAD`, `XRANGE`).
-
-Stream messages are required to be polled. Polling can return either in a non-blocking
-way without a message if no message is available, or, in a blocking way.
-`XREAD` allows to specify a blocking duration in which the connection is blocked
-until either the timeout is exceeded or a Stream message arrives.
-
-The following example shows how to append and read messages from a Redis Stream:
+The protocol version can be changed through `ClientOptions` which disables protocol discovery:
 
 ```java
-// Append a message to the stream
-String messageId = redis.xadd("my-stream", Collections.singletonMap("key", "value"));
-
-// Read a message
-List<StreamMessage<String, String>> messages = redis.xread(StreamOffset.from("my-stream", messageId));
-
-
-redis.xadd("my-stream", Collections.singletonMap("key", "value"));
-
-// Blocking read
-List<StreamMessage<String, String>> messages = redis.xread(XReadArgs.Builder.block(Duration.ofSeconds(2)), 
-                                                           StreamOffset.latest("my-stream"));
+ClientOptions options = ClientOptions.builder().protocolVersion(ProtocolVersion.RESP2).build();
 ```
 
-Redis Streams support the notion of consumer groups. A consumer group is a group of 
-one or more consumers that tracks the last consumed Stream message and allows 
-explicit acknowledgment of consumed messages. 
+Future versions are going to discover the protocol version as part of the connection handshake and use the newest available protocol version.
+
+ACL Authentication
+------------------
+
+Redis 6 supports authentication using username and password. Lettuce's `RedisURI` adapts to this change by allowing to specify a username:
+
+`redis://username:password@host:port/database`
+
+Using RESP3 or PING on connect authenticates the connection during the handshake phase. Already connected connections may switch the user context by issuing an `AUTH` command with username and password:
 
 ```java
-// Setup stream, see https://github.com/antirez/redis/issues/4824
-redis.xadd("my-stream", Collections.singletonMap("key", "value"));
-
-// Create consumer group
-redis.xgroupCreate("my-stream", "my-group", "$");
-redis.xadd("my-stream", Collections.singletonMap("key", "value"));
-
-// Read stream messages in the context of a consumer
-List<StreamMessage<String, String>> messages = redis.xreadgroup(Consumer.from("my-stream", "consumer1"),
-                XReadArgs.Builder.noack(),
-                StreamOffset.lastConsumed(key));
-
-// process message
-
-…
-
-// Acknowledge message
-redis.xack(key, "group", messages.get(0).getId());
-```
-
-Scan Stream
------------
-
-Lettuce 5.1 ships with a reactive `SCAN` stream API that allows reactive and
-demand-aware usage of Redis' `SCAN` commands. `SCAN` is an interator-based command
-that requires multiple round-trips to Redis to scan the keyspace or 
-a particular data structure. Instead of calling `SCAN` from your application code, 
-you can use `ScanStream` as entrypoint to `SCAN`, `HSCAN`, `SSCAN`, and `ZSCAN` operations.
-`ScanStream` returns a `Flux` that can be consumed as a single stream without
-the need of continuing the actual iteration. That's covered by Lettuce for you.
-
-The `LIMIT` argument controls the batchsize. Demand (backpressure) is translated
-into cursor call. If you stop consuming the stream, no further `SCAN` calls are issued.
- 
-```java
-RedisReactiveCommands<String, String> reactive = redis.getStatefulConnection().reactive();
-
-Flux<String> keys = ScanStream.scan(reactive, ScanArgs.Builder.limit(200));
-```
-
-Asynchronous non-blocking Connection Pooling
---------------------------------------------
-
-Right now, applications that utilize connection pooling in combination with a 
-non-blocking API (asynchronous or reactive API users) are limited to Apache Commons Pool
-which is a blocking object pool implementation.
-
-This release ships with non-blocking pooling support through `AsyncPool` that
-is obtained from `AsyncConnectionPoolSupport`. The pooling API allows for various
-implementations. As of Lettuce 5.1, a bounded pool is provided that allows 
-limiting and that signals pool exhaustion by emitting `NoSuchElementException`.
-
-The pooling API returns `CompletableFuture` instances to synchronize acquire and 
-release operations. `AsyncPool` does not require external dependencies and features
-an improved performance profile in comparison to Apache Commons Pool 2. 
-This non-blocking pooling API is not a replacement for the blocking pool 
-although it's possible that may provide a blocking layer that exports 
-the pooling functionality through `org.apache.commons.pool2.ObjectPool`. 
-
-The following example show how to use `AsyncPool`. 
-
-```java
-AsyncPool<StatefulRedisConnection<String, String>> pool = AsyncConnectionPoolSupport.createBoundedObjectPool(
-        () -> client.connectAsync(StringCodec.UTF8, uri),
-        BoundedPoolConfig.builder()
-                    .minIdle(4)
-                    .maxIdle(8)
-                    .maxTotal(16)
-                    .testOnAcquire()
-                    .build());
-
-// Acquire connection and do some work
-CompletableFuture<StatefulRedisConnection<String, String>> acquire = pool.acquire();
-
-acquire.thenAccept(connection -> {
-
-    connection.async().set("key", "value").whenComplete((v, e) -> {
-        pool.release(connection);
-    });
-});
-
-
-// later
-CompletableFuture<Void> closeFuture = pool.closeAsync();
-```
-
-Global Command Timeouts
------------------------
-
-Lettuce can be used through various APIs. The most common one is the
-synchronous API which emulates blocking behavior on top of a reactive 
-and non-blocking driver. A natural aspect of blocking APIs are timeouts
-when it comes to I/O. Using the asynchronous or reactive API do not have
-timeouts as there was no active component that tracked command runtime durations.
-
-With Lettuce 5.1, you get the possibility to configure a global command timeout
-through `ClientOptions` and `TimeoutOptions` that can determine timeouts
-on a `RedisCommand` basis. This timeout applies on a command basis
-and completes commands with `RedisCommandTimeoutException`.  
-
-You can change the timeout on running connections through `RedisURI.setTimeout(…)`, 
-`RedisClient.setDefaultTimeout(…)`, and `StatefulConnection.setTimeout(…)` if
-`TimeoutOptions` are enabled - global command timeouts are disabled by default. 
-
-```java
-TimeoutOptions timeoutOptions = TimeoutOptions.enabled(Duration.ofMinutes(1));
-
-ClientOptions.builder().timeoutOptions(timeoutOptions).build();
-```
-
-Add tracing support using Brave (OpenZipkin)
---------------------------------------------
-
-Lettuce now supports command tracing using Brave. 
-Tracing can be configured through `ClientResources`. The parent span is propagated either 
-through `Tracing.currentTracer()` (synchronous/asynchronous usage) or 
-by registering a Brave Span in the Reactor context when using Reactive execution.
-
-Lettuce wraps Brave data models to support tracing in a vendor-agnostic way if 
-Brave is on the class path.
-
-Usage example:
-
-```java
-Tracing tracing = …;
-
-ClientResources clientResources = ClientResources.builder().tracing(BraveTracing.create(tracing)).build();
-
-RedisClient client = RedisClient.create(clientResources, redisUri);
-
 StatefulRedisConnection<String, String> connection = client.connect();
-
-connection.sync().get(…) // Tracing tries to obtain the current tracer from Tracing.currentTracer()
-
-connection.reactive().get(…) // Tracing tries to obtain the current tracer from Reactor's Context
+RedisCommands<String, String> commands = connection.sync();
+commands.auth("username", "password");
 ```
 
-A note on reactive Tracing: Reactive Tracing with Brave requires either a Span or a 
-TraceContext object to be available in Reactor's Context.
+Asynchronous Cluster Topology Refresh
+-------------------------------------
 
-Commands
---------
-* Add AUTH option to MIGRATE command #733
-* Add MASTER type to KillArgs #760
-* Add support for ZPOPMIN, ZPOPMAX, BZPOPMIN, BZPOPMAX commands #778
-* Add REPLACE option to RESTORE. #783 (Thanks to @christophstrobl)
-* Add XGROUP DESTROY #789
-* Add support for CLIENT UNBLOCK #812
-* Support for approximate trimming in XAddArgs #846
+Cluster Topology Refresh was in Lettuce 4 and 5 a blocking and fully synchronous task that required a worker thread. A side-effect of the topology refresh was that command timeouts could be delayed as the worker thread pool was used for timeout tasks and the topology refresh. Lettuce 6 ships with a fully non-blocking topology refresh mechanism which is basically a reimplementation of the previous refresh mechanism but using non-blocking components instead.
+
+API cleanups/Breaking Changes
+-----------------------------
+
+With this release, we took the opportunity to introduce a series of changes that put the API into a cleaner shape. 
+
+* Script Commands: `eval`, `digest`, `scriptLoad` methods now only accept `String` and `byte[]` argument types. Previously `digest` and `scriptLoad` accepted the script contents as Codec value type which caused issues especially when marshalling values using JSON or Java Serialization. The script charset can be configured via `ClientOptions` (`ClientOptions.builder().scriptCharset(StandardCharsets.US_ASCII).build();`), defaulting to UTF-8.
+* Connection: Removal of deprecated timeout methods accepting `TimeUnit`. Use methods accepting `Duration` instead.
+* Async Commands: `RedisAsyncCommands.select(…)` and `.auth(…)` methods return now futures instead if being blocking methods.
+* Asynchronous API Usage: Connection and Queue failures now no longer throw an exception but properly associate the failure with the Future handle.
+* Master/Replica API: Move implementation classes from `io.lettuce.core.masterslave` to `io.lettuce.core.masterreplica` package.
+* Internal: Removal of the internal `LettuceCharsets` utility class.
+* Internal: Reduced visibility of several `protected` fields in `AbstractRedisClient` (`eventLoopGroups`, `genericWorkerPool`, `timer`, `clientResources`, `clientOptions`, `defaultTimeout`).
+* Internal: Consolidation of Future synchronization utilities (`LettuceFutures`, `RefreshFutures`, `Futures`).
 
 Enhancements
 ------------
-* Support for command timeouts (async, reactive) #435
-* Use object pooling for collections inside a single method and Command/CommandArgs with a small scope #459
-* Cancel commands after disconnect in at-most-once mode. #547
-* Add support for Redis streams #606
-* Introduce dedicated exceptions for NOSCRIPT and BUSY responses #620 (Thanks to @DaichiUeura)
-* Non-blocking connection pooling #631
-* Introduce fast-path publishing in RedisPublisher #637
-* Add reactive scanning #638
-* Asynchronous connection initialization #640
-* Create reusable abstraction for non-blocking and keyed connection provider #642
-* Expose asynchronous connect method for Master/Slave connections #643
-* Add SocketAddressOutput to directly parse SENTINEL get-master-addr-by-name output #644
-* Misleading wasRolledBack method #662 (Thanks to @graineri)
-* Read from random slave preferred #676 (Thanks to @petetanton)
-* Introduce exception to represent Redis LOADING response #682
-* Do not fail if COMMAND command fails on startup #685 (Thanks to @pujian1984)
-* Consider adding host/port mapper #689
-* CommandHandler.write() is O(N^2) #709 (Thanks to @gszpak)
-* Cluster topology lookup should not replaces self-node details with host and port from RedisURI when RedisURI is load balancer #712 (Thanks to @warrenzhu25)
-* Optimize Partitions/RedisClusterNode representation #715
-* Unnecessary copying of byteBuf in CommandHandler.decode() #725 (Thanks to @gszpak)
-* Add unknown node as trigger for adaptive refresh #732
-* Add tracing support using Brave (OpenZipkin) #782
-* Improve builders and resources with Java 8 default/static interface methods #791
-* ZSCAN match pattern encoding issue #792 (Thanks to @silvertype)
-* Accept brave.Tracing instead of brave.Tracer #798
-* Bind Master/Slave transactional commands to Master during an ongoing transaction #800
-* FutureSyncInvocationHandler the statement "command.get ()" in the handlerInvocation method is unnecessary #809 (Thanks to @zhangweidavid)
-* Fall back to initial seed nodes on topology refresh when dynamicRefreshSources is enabled #822 (Thanks to @stuartharper)
-* Assert Java 11 build compatibility #841
+* Use channel thread to enqueue commands #617
+* Redesign connection activation #697
+* Add support for RESP3 #964
+* Consolidate Future utils #1039
+* Make RedisAsyncCommands.select() and auth() async #1118 (Thanks to @ikkyuland)
+* Allow client to pick a specific TLS version and introduce PEM-based configuration #1167 (Thanks to @amohtashami12307)
+* Optimization of BITFIELD args generation #1175 (Thanks to @ianpojman)
+* Add mutate() to SocketOptions #1193
+* Add CLIENT ID command #1197
+* Lettuce not able to reconnect automatically to SSL+authenticated ElastiCache node #1201 (Thanks to @chadlwilson)
+* Add support for AUTH with user + password introduced in Redis 6 #1202 (Thanks to @tgrall)
+* HMSET deprecated in version 4.0.0 #1217 (Thanks to @hodur)
+* Allow selection of Heap or Direct buffers for CommandHandler.buffer #1223 (Thanks to @dantheperson)
+* Support JUSTID flag of XCLAIM command #1233 (Thanks to @christophstrobl)
+* Add support for KEEPTTL with SET #1234
+* Add support for RxJava 3 #1235
+* Retrieve username from URI when RedisURI is built from URL #1242 (Thanks to @gkorland)
+* Introduce ThreadFactoryProvider to DefaultEventLoopGroupProvider for easier customization #1243 (Thanks to @apilling6317)
 
 Fixes
 -----
-* PING responses are not decoded properly if Pub/Sub connection is subscribed #579
-* Lettuce doesn't fail early & cleanly with a host in protected mode #608 (Thanks to @exercitussolus)
-* CommandHandler.rebuildQueue() causes long locks #615 (Thanks to @nikolayspb)
-* Request queue size is not cleared on reconnect #616 (Thanks to @nikolayspb)
-* BITPOS should allow to just specify start. #623 (Thanks to @christophstrobl)
-* HMGET proxy not working as expected #627 (Thanks to @moores-expedia)
-* Consider binary arguments using command interfaces as keys using binary codecs #628
-* Command.isDone() not consistent with CompletableFuture.isDone() #629
-* Race condition in RedisPublisher DEMAND.request() and DEMAND.onDataAvailable() #634 (Thanks to @mayamoon)
-* RedisPublisher.request(-1) does not fail #635
-* Capture subscription state before logging in RedisPublisher #636
-* Provide Javadoc path for Project Reactor #641
-* Debug logging of ConnectionWatchdog has wrong prefix after reconnect. #645 (Thanks to @mlex)
-* Cannot close connection when refreshing topology #656 (Thanks to @dangtranhoang)
-* Weights param should be ignored if it is empty #657 (Thanks to @garfeildma)
-* MasterSlave getNodeSpecificViews NPE with sync API #659 (Thanks to @boughtonp)
-* RandomServerHandler can respond zero bytes #660
-* ConcurrentModificationException when connecting a RedisClusterClient #663 (Thanks to @blahblahasdf)
-* Switch RedisSubscription.subscriber to volatile #664
-* Recovered Sentinels in Master/Slave not reconnected #668
-* Handling dead Sentinel slaves #669 (Thanks to @vleushin)
-* Move SocketAddressResolver resolution back to calling thread #670
-* Support SLAVE_PREFERRED at valueOf method #671 (Thanks to @be-hase)
-* RedisCommandTimeoutException after two subsequent MULTI calls without executing the transaction #673 (Thanks to @destitutus)
-* Fix ConnectionWatchDog won't reconnect problem in edge case #679 (Thanks to @kojilin)
-* At least once mode keeps requeueing commands on non-recoverable errors #680 (Thanks to @mrvisser)
-* Retain ssl/tls config from seed uris in Master/Slave context #684 (Thanks to @acmcelwee)
-* NOAUTH after full queue and reconnect #691
-* RedisURI.create("localhost") causes NPE #694
-* Async connect methods report original cause #708
-* Mono returned by RedisPubSubReactiveCommands#subscribe does not return result #717 (Thanks to @ywtsang)
-* RuntimeExceptions thrown by implementations of RedisCodec do not fail TransactionCommands #719 (Thanks to @blahblahasdf)
-* Connection Leak in Cluster Topology Refresh #721 (Thanks to @cweitend)
-* Ensure Master/Slave topology refresh connections are closed #723
-* RedisPubSubAdapter.message() being called with wrong channel #724 (Thanks to @adimarco)
-* Batched commands may time out although data was received #729
-* DefaultEndpoint future listener recycle lose command context on requeue failures #734 (Thanks to @gszpak)
-* AsyncPool, AsyncConnectionPoolSupport are nowhere to be found #739 (Thanks to @fabienrenaud)
-* firstResponseLatency is always negative #740 (Thanks to @nickvollmar)
-* EXEC does not fail on EXECABORT #743 (Thanks to @dmandalidis)
-* Warning when refreshing topology #756 (Thanks to @theliro)
-* DefaultEndpoint.QUEUE_SIZE becomes out of sync, preventing command queueing #764 (Thanks to @nivekastoreth)
-* DefaultEndpoint contains System.out.println(…) #765
-* Do not retry completed commands through RetryListener #767
-* MULTI is dispatched to slave nodes using SLAVE readFrom #779 (Thanks to @Yipei)
-* Reduce service name in BraveTracing to just Redis #797
-* Javadoc mentions Delay.exponential() is capped at 30 milliseconds #799 (Thanks to @phxql)
-* Read From Slaves is not working #804 (Thanks to @EXPEbdodla)
-* GEORADIUS WITHCOORD returns wrong coordinate on multiple results #805 (Thanks to @dittos)
-* RedisClusterCommands does not extend RedisStreamCommands #821
-* smembers returns elements in non-deterministic order #823 (Thanks to @alezandr)
-* StackOverflowError on ScanStream.scan(…).subscribe() #824
-* ZINCRBY member should be value-typed #826 (Thanks to @fuyuanpai)
-* Lua script execution containing non-ascii characters fails #844 (Thanks to @wenzuowei110)
-* RedisState fails to resolve CommandType for known commands #851
+* Commands Timeout ignored/not working during refresh #1107 (Thanks to @pendula95)
+* StackOverflowError in RedisPublisher #1140 (Thanks to @csunwold)
+* Incorrect access on io.lettuce.core.ReadFrom.isOrderSensitive() #1145 (Thanks to @orclev)
+* Consider ReadFrom.isOrderSensitive() in cluster scan command #1146
+* Improve log message for nodes that cannot be reached during reconnect/topology refresh #1152 (Thanks to @drewcsillag)
+* BoundedAsyncPool doesn't work with a negative maxTotal #1181 (Thanks to @sguillope)
+* TLS setup fails to a master reported by sentinel #1209 (Thanks to @ae6rt)
+* Lettuce metrics creates lots of long arrays, and gives out of memory error.  #1210 (Thanks to @omjego)
+* CommandSegments.StringCommandType does not implement hashCode()/equals() #1211
+* Unclear documentation about quiet time for RedisClient#shutdown  #1212 (Thanks to @LychakGalina)
+* StreamReadOutput in Lettuce 6 creates body entries containing the stream id #1216
+* Write race condition while migrating/importing a slot #1218 (Thanks to @phyok)
+* randomkey return V not K #1240 (Thanks to @hosunrise)
+* ConcurrentModificationException iterating over partitions #1252 (Thanks to @johnny-costanzo)
+* Replayed activation commands may fail because of their execution sequence #1255 (Thanks to @robertvazan)
+* Fix infinite command timeout #1260
+* Connection leak using pingBeforeActivateConnection when PING fails #1262 (Thanks to @johnny-costanzo)
+* Lettuce blocked when connecting to Redis #1269 (Thanks to @jbyjby1)
+* Stream commands are not considered for ReadOnly routing #1271 (Thanks to @redviper)
 
 Other
 -----
-* Upgrade to HdrHistogram 2.1.10 #653
-* Upgrade Redis versions on TravisCI #655
-* Upgrade to Log4j 2.11.0 #749
-* Extend documentation for argument objects #761
-* Upgrade to JavaParser 3.6.3 #769
-* Update What's new for Lettuce 5.1 in reference docs #777
-* Improve Javadoc of QUIT method #781
-* Upgrade to netty 4.1.29.Final #836
-* Upgrade to Reactor Bismuth-SR11 #838
-* Upgrade to Brave 5.2.0 #839
-* Upgrade to RxJava 2.2.2 #840
-* Upgrade to Commons Pool 2.6 #854
-* Upgrade to Mockito 2.22 #855
-* Upgrade to commons-lang3 3.8 #857
-* Upgrade to Spring Framework 4.3.19 #858
-* Upgrade to Reactor Californium #859
+* Refactor script content argument types to String and byte[] instead of V (value type) #1010 (Thanks to @danielsomekh)
+* Render Redis.toString() to a Redis URI #1040
+* Pass Allocator as RedisStateMachine constructor argument #1053
+* Simplify condition to invoke "resolveCodec" method in AnnotationRedisCodecResolver #1149 (Thanks to @machi1990)
+* Encode database in RedisURI in path when possible #1155
+* Remove LettuceCharsets #1156
+* Move SocketAddress resolution from RedisURI to SocketAddressResolver #1157
+* Remove deprecated timeout methods accepting TimeUnit #1158
+* Upgrade to RxJava 2.2.13 #1162
+* Add ByteBuf.touch(…) to aid buffer leak investigation #1164
+* Add warning log if MasterReplica(…, Iterable<RedisURI>) contains multiple Sentinel URIs #1165
+* Adapt GEOHASH tests to 10 chars #1196
+* Migrate Master/Replica support to the appropriate package #1199
+* Disable RedisURIBuilderUnitTests failing on Windows OS #1204 (Thanks to @kshchepanovskyi)
+* Provide a default port(DEFAULT_REDIS_PORT) to RedisURI's Builder #1205 (Thanks to @hepin1989)
+* Update code for pub/sub to listen on the stateful connection object. #1207 (Thanks to @judepereira)
+* Un-deprecate ClientOptions.pingBeforeActivateConnection #1208
+* Use consistently a shutdown timeout of 2 seconds in all AbstractRedisClient.shutdown methods #1214
+* Upgrade dependencies (netty to 4.1.49.Final) #1161, #1224, #1225, #1239, #1259
+* RedisURI class does not parse password when using redis-sentinel #1232 (Thanks to @kyrogue)
+* Reduce log level to DEBUG for native library logging #1238 (Thanks to @DevJoey)
+* Reduce visibility of fields in AbstractRedisClient #1241
+* Upgrade to stunnel 5.56 #1246
+* Add build profiles for multiple Java versions #1247
+* Replace outdated Sonatype parent POM with plugin definitions #1258
+* Upgrade to RxJava 3.0.2 #1261
+* Enable Sentinel tests after Redis fixes RESP3 handshake #1266
+* Consolidate exception translation and bubbling #1275
+* Reduce min thread count to 2 #1278

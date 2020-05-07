@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ import io.lettuce.core.cluster.api.reactive.RedisClusterReactiveCommands;
 import io.lettuce.core.cluster.api.sync.RedisAdvancedClusterCommands;
 import io.lettuce.core.cluster.api.sync.RedisClusterCommands;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.test.*;
 import io.lettuce.test.condition.EnabledOnCommand;
 import io.netty.util.internal.ConcurrentSet;
@@ -114,7 +114,7 @@ class AdvancedClusterReactiveIntegrationTests extends TestSupport {
 
         msetCrossSlot();
 
-        Map<Integer, List<String>> partitioned = SlotHash.partition(new Utf8StringCodec(), KeysAndValues.KEYS);
+        Map<Integer, List<String>> partitioned = SlotHash.partition(StringCodec.UTF8, KeysAndValues.KEYS);
         assertThat(partitioned.size()).isGreaterThan(100);
 
         Flux<KeyValue<String, String>> flux = commands.mget(KeysAndValues.KEYS.toArray(new String[KeysAndValues.COUNT]));
@@ -240,17 +240,18 @@ class AdvancedClusterReactiveIntegrationTests extends TestSupport {
 
         List<RedisFuture<?>> futures = new ArrayList<>();
         RedisClusterAsyncCommands<String, String> async = commands.getStatefulConnection().async();
-        Futures.await(async.flushall());
+        TestFutures.awaitOrTimeout(async.flushall());
 
         for (int i = 0; i < 1000; i++) {
             futures.add(async.set("key-" + i, "value-" + i));
         }
 
-        Futures.awaitAll(futures);
+        TestFutures.awaitOrTimeout(futures);
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
             CompletableFuture<Long> future = commands.keys("*").count().toFuture();
-            Futures.await(future);
+            TestFutures.awaitOrTimeout(future);
+            assertThat(future).isCompletedWithValue(1000L);
         }
     }
 
@@ -313,8 +314,7 @@ class AdvancedClusterReactiveIntegrationTests extends TestSupport {
         connection.readOnly().subscribe();
         commands.set(key, value).subscribe();
 
-        NodeSelectionAsyncIntegrationTests
-                .waitForReplication(commands.getStatefulConnection().async(), ClusterTestSettings.key,
+        NodeSelectionAsyncIntegrationTests.waitForReplication(commands.getStatefulConnection().async(), ClusterTestSettings.key,
                 ClusterTestSettings.port4);
 
         AtomicBoolean error = new AtomicBoolean();
@@ -414,8 +414,8 @@ class AdvancedClusterReactiveIntegrationTests extends TestSupport {
             }
         } while (!scanCursor.isFinished());
 
-        assertThat(adapter.getList()).containsAll(
-                KeysAndValues.KEYS.stream().filter(k -> k.startsWith("a")).collect(Collectors.toList()));
+        assertThat(adapter.getList())
+                .containsAll(KeysAndValues.KEYS.stream().filter(k -> k.startsWith("a")).collect(Collectors.toList()));
     }
 
     private void writeKeysToTwoNodes() {

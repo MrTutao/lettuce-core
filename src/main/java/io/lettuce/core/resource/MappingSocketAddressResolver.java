@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,7 +68,7 @@ public class MappingSocketAddressResolver extends SocketAddressResolver {
     public SocketAddress resolve(RedisURI redisURI) {
 
         if (redisURI.getSocket() != null) {
-            return redisURI.getResolvedAddress();
+            return getDomainSocketAddress(redisURI);
         }
 
         HostAndPort hostAndPort = HostAndPort.of(redisURI.getHost(), redisURI.getPort());
@@ -81,7 +81,7 @@ public class MappingSocketAddressResolver extends SocketAddressResolver {
         try {
             return doResolve(mapped);
         } catch (UnknownHostException e) {
-            return redisURI.getResolvedAddress();
+            return new InetSocketAddress(redisURI.getHost(), redisURI.getPort());
         }
     }
 

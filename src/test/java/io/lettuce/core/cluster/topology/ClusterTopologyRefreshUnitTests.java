@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 package io.lettuce.core.cluster.topology;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -24,8 +23,11 @@ import static org.mockito.Mockito.*;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +53,7 @@ import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.DnsResolvers;
 import io.lettuce.core.resource.SocketAddressResolver;
 import io.lettuce.test.settings.TestSettings;
+import io.netty.util.Timeout;
 import io.netty.util.concurrent.EventExecutorGroup;
 
 /**
@@ -62,14 +65,12 @@ import io.netty.util.concurrent.EventExecutorGroup;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class ClusterTopologyRefreshUnitTests {
 
-    private static final long COMMAND_TIMEOUT_NS = TimeUnit.MILLISECONDS.toNanos(10);
-
     private static final String NODE_1_VIEW = "1 127.0.0.1:7380 master,myself - 0 1401258245007 2 disconnected 8000-11999\n"
             + "2 127.0.0.1:7381 master - 111 1401258245007 222 connected 7000 12000 12002-16383\n";
     private static final String NODE_2_VIEW = "1 127.0.0.1:7380 master - 0 1401258245007 2 disconnected 8000-11999\n"
             + "2 127.0.0.1:7381 master,myself - 111 1401258245007 222 connected 7000 12000 12002-16383\n";
 
-    private ClusterTopologyRefresh sut;
+    private DefaultClusterTopologyRefresh sut;
 
     @Mock
     private RedisClusterClient client;
@@ -101,6 +102,9 @@ class ClusterTopologyRefreshUnitTests {
     @BeforeEach
     void before() {
 
+        io.netty.util.Timer timer = mock(io.netty.util.Timer.class);
+        when(timer.newTimeout(any(), anyLong(), any())).thenReturn(mock(Timeout.class));
+        when(clientResources.timer()).thenReturn(timer);
         when(clientResources.socketAddressResolver()).thenReturn(SocketAddressResolver.create(DnsResolvers.JVM_DEFAULT));
         when(clientResources.eventExecutorGroup()).thenReturn(eventExecutors);
         when(connection1.async()).thenReturn(asyncCommands1);
@@ -118,6 +122,13 @@ class ClusterTopologyRefreshUnitTests {
 
             if (command.getType() == CommandType.CLIENT) {
                 command.getOutput().set(ByteBuffer.wrap("c1\nc2\n".getBytes()));
+                command.complete();
+            }
+
+            if (command.getType() == CommandType.INFO) {
+                command.getOutput().set(ByteBuffer.wrap(
+                        "# Clients\nconnected_clients:2\nclient_longest_output_list:0\nclient_biggest_input_buf:0\nblocked_clients:0"
+                                .getBytes()));
                 command.complete();
             }
 
@@ -140,13 +151,30 @@ class ClusterTopologyRefreshUnitTests {
                 command.complete();
             }
 
+            if (command.getType() == CommandType.INFO) {
+                command.getOutput().set(ByteBuffer.wrap(
+                        "# Clients\nconnected_clients:2\nclient_longest_output_list:0\nclient_biggest_input_buf:0\nblocked_clients:0"
+                                .getBytes()));
+                command.complete();
+            }
+
             command.encodedAtNs = 10;
             command.completedAtNs = 20;
 
             return command;
         });
 
-        sut = new ClusterTopologyRefresh(nodeConnectionFactory, clientResources);
+        sut = new DefaultClusterTopologyRefresh(nodeConnectionFactory, clientResources);
+    }
+
+    @Test
+    void getNodeTopologyView() throws Exception {
+        Requests requestedTopology = createClusterNodesRequests(1, NODE_1_VIEW);
+        Requests requestedClients = createClientListRequests(1,
+                "# Clients\r\nconnected_clients:2438\r\nclient_longest_output_list:0\r\nclient_biggest_input_buf:0\r\nblocked_clients:0");
+        RedisURI redisURI = RedisURI.create("redis://localhost:1");
+        NodeTopologyView nodeTopologyView = NodeTopologyView.from(redisURI, requestedTopology, requestedClients);
+        assertThat(nodeTopologyView.getConnectedClients()).isEqualTo(2438);
     }
 
     @Test
@@ -157,7 +185,7 @@ class ClusterTopologyRefreshUnitTests {
 
         Requests clientRequests = createClientListRequests(1, "c1\nc2\n").mergeWith(createClientListRequests(2, "c1\nc2\n"));
 
-        NodeTopologyViews nodeSpecificViews = sut.getNodeSpecificViews(requests, clientRequests, COMMAND_TIMEOUT_NS);
+        NodeTopologyViews nodeSpecificViews = sut.getNodeSpecificViews(requests, clientRequests);
 
         Collection<Partitions> values = nodeSpecificViews.toMap().values();
 
@@ -175,7 +203,7 @@ class ClusterTopologyRefreshUnitTests {
 
         List<RedisURI> seed = Arrays.asList(RedisURI.create("127.0.0.1", 7380), RedisURI.create("127.0.0.1", 7381));
 
-        sut.loadViews(seed, true);
+        sut.loadViews(seed, Duration.ofSeconds(1), true);
 
         verifyZeroInteractions(nodeConnectionFactory);
     }
@@ -195,7 +223,7 @@ class ClusterTopologyRefreshUnitTests {
 
         Requests clientRequests = createClientListRequests(1, "c1\nc2\n").mergeWith(createClientListRequests(2, "c1\nc2\n"));
 
-        NodeTopologyViews nodeSpecificViews = sut.getNodeSpecificViews(requests, clientRequests, COMMAND_TIMEOUT_NS);
+        NodeTopologyViews nodeSpecificViews = sut.getNodeSpecificViews(requests, clientRequests);
 
         Collection<Partitions> values = nodeSpecificViews.toMap().values();
 
@@ -220,10 +248,10 @@ class ClusterTopologyRefreshUnitTests {
                 + "n6 10.37.110.65:7000 master - 0 1452553663844 45 connected 0-3828 6788-7996 10000-10038 15000-16383";
 
         Requests clusterNodesRequests = createClusterNodesRequests(1, nodes1);
-        Requests clientRequests = createClientListRequests(1, "c1\nc2\n");
+        Requests clientRequests = createClientListRequests(1,
+                "# Clients\r\nconnected_clients:2\r\nclient_longest_output_list:0\r\nclient_biggest_input_buf:0\r\nblocked_clients:0");
 
-        NodeTopologyViews nodeSpecificViews = sut
-                .getNodeSpecificViews(clusterNodesRequests, clientRequests, COMMAND_TIMEOUT_NS);
+        NodeTopologyViews nodeSpecificViews = sut.getNodeSpecificViews(clusterNodesRequests, clientRequests);
 
         List<Partitions> values = new ArrayList<>(nodeSpecificViews.toMap().values());
 
@@ -248,8 +276,7 @@ class ClusterTopologyRefreshUnitTests {
 
         Requests clientRequests = createClientListRequests(5, "c1\nc2\n").mergeWith(createClientListRequests(1, "c1\nc2\n"));
 
-        NodeTopologyViews nodeSpecificViews = sut
-                .getNodeSpecificViews(clusterNodesRequests, clientRequests, COMMAND_TIMEOUT_NS);
+        NodeTopologyViews nodeSpecificViews = sut.getNodeSpecificViews(clusterNodesRequests, clientRequests);
         List<Partitions> values = new ArrayList<>(nodeSpecificViews.toMap().values());
 
         assertThat(values).hasSize(2);
@@ -269,7 +296,7 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381))))
                 .thenReturn(completedWithException(new RedisException("connection failed")));
 
-        sut.loadViews(seed, true);
+        sut.loadViews(seed, Duration.ofSeconds(1), true);
 
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380)));
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381)));
@@ -286,11 +313,12 @@ class ClusterTopologyRefreshUnitTests {
                 .thenReturn(completedWithException(new RedisException("connection failed")));
 
         try {
-            sut.loadViews(seed, true);
+            sut.loadViews(seed, Duration.ofSeconds(1), true).toCompletableFuture().join();
             fail("Missing RedisConnectionException");
         } catch (Exception e) {
-            assertThat(e).hasMessageStartingWith("Unable to establish a connection to Redis Cluster");
-            assertThat(e.getSuppressed()).hasSize(1);
+
+            assertThat(e.getCause()).hasMessageStartingWith("Cannot retrieve cluster partitions from ");
+            assertThat(e.getCause().getSuppressed()).hasSize(2);
         }
 
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380)));
@@ -307,7 +335,7 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection2));
 
-        sut.loadViews(seed, true);
+        sut.loadViews(seed, Duration.ofSeconds(1), true);
 
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380)));
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381)));
@@ -321,7 +349,7 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection1));
 
-        sut.loadViews(seed, false);
+        sut.loadViews(seed, Duration.ofSeconds(1), false);
 
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380)));
         verifyNoMoreInteractions(nodeConnectionFactory);
@@ -339,7 +367,7 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection2));
 
-        sut.loadViews(seed, true);
+        sut.loadViews(seed, Duration.ofSeconds(1), true);
 
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380)));
         verify(nodeConnectionFactory).connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381)));
@@ -355,7 +383,7 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection2));
 
-        sut.loadViews(seed, true);
+        sut.loadViews(seed, Duration.ofSeconds(1), true);
 
         verify(connection1).closeAsync();
         verify(connection2).closeAsync();
@@ -369,14 +397,15 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection1));
 
-        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, false);
+        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, Duration.ofSeconds(1), false).toCompletableFuture()
+                .join();
 
         Partitions partitions = partitionsMap.values().iterator().next();
 
         List<RedisClusterNode> nodes = TopologyComparators.sortByClientCount(partitions);
 
-        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri)
-                .containsSequence(seed.get(0), RedisURI.create("127.0.0.1", 7381));
+        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri).containsSequence(seed.get(0),
+                RedisURI.create("127.0.0.1", 7381));
     }
 
     @Test
@@ -389,14 +418,14 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection2));
 
-        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, true);
+        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, Duration.ofSeconds(1), true).toCompletableFuture().join();
 
         Partitions partitions = partitionsMap.values().iterator().next();
 
         List<RedisClusterNode> nodes = TopologyComparators.sortByClientCount(partitions);
 
-        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri)
-                .containsSequence(RedisURI.create("127.0.0.1", 7381), seed.get(0));
+        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri).containsSequence(RedisURI.create("127.0.0.1", 7381),
+                seed.get(0));
     }
 
     @Test
@@ -407,14 +436,15 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7380))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection1));
 
-        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, false);
+        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, Duration.ofSeconds(1), false).toCompletableFuture()
+                .join();
 
         Partitions partitions = partitionsMap.values().iterator().next();
 
         List<RedisClusterNode> nodes = TopologyComparators.sortByLatency(partitions);
 
-        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri)
-                .containsSequence(seed.get(0), RedisURI.create("127.0.0.1", 7381));
+        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri).containsSequence(seed.get(0),
+                RedisURI.create("127.0.0.1", 7381));
     }
 
     @Test
@@ -427,14 +457,14 @@ class ClusterTopologyRefreshUnitTests {
         when(nodeConnectionFactory.connectToNodeAsync(any(RedisCodec.class), eq(new InetSocketAddress("127.0.0.1", 7381))))
                 .thenReturn(completedFuture((StatefulRedisConnection) connection2));
 
-        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, true);
+        Map<RedisURI, Partitions> partitionsMap = sut.loadViews(seed, Duration.ofSeconds(1), true).toCompletableFuture().join();
 
         Partitions partitions = partitionsMap.values().iterator().next();
 
         List<RedisClusterNode> nodes = TopologyComparators.sortByLatency(partitions);
 
-        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri)
-                .containsSequence(RedisURI.create("127.0.0.1", 7381), seed.get(0));
+        assertThat(nodes).hasSize(2).extracting(RedisClusterNode::getUri).containsSequence(RedisURI.create("127.0.0.1", 7381),
+                seed.get(0));
     }
 
     @Test
@@ -461,7 +491,7 @@ class ClusterTopologyRefreshUnitTests {
             return command;
         });
 
-        RedisException nestedException = new RedisException("AUTH");
+        RedisException nestedException = new RedisException("NESTED");
 
         when(connection2.dispatch(any(RedisCommand.class))).thenAnswer(invocation -> {
 
@@ -470,17 +500,25 @@ class ClusterTopologyRefreshUnitTests {
             return command;
         });
 
-        assertThatThrownBy(() -> sut.loadViews(seed, true)).isInstanceOf(RedisException.class)
-                .hasRootCauseInstanceOf(RedisException.class).hasSuppressedException(nestedException);
+        CompletionStage<Map<RedisURI, Partitions>> actual = sut.loadViews(seed, Duration.ofSeconds(1), true);
+        assertThat(actual).isCompletedExceptionally();
+
+        try {
+            actual.toCompletableFuture().join();
+            fail("Missing CompletionException");
+        } catch (CompletionException e) {
+
+            assertThat(e.getCause()).hasSuppressedException(nestedException);
+        }
     }
 
     Requests createClusterNodesRequests(int duration, String nodes) {
 
         RedisURI redisURI = RedisURI.create("redis://localhost:" + duration);
-        Connections connections = new Connections();
+        Connections connections = new Connections(clientResources, new HashMap<>());
         connections.addConnection(redisURI, connection);
 
-        Requests requests = connections.requestTopology();
+        Requests requests = connections.requestTopology(100, TimeUnit.SECONDS);
         TimedAsyncCommand<String, String, String> command = requests.getRequest(redisURI);
 
         command.getOutput().set(ByteBuffer.wrap(nodes.getBytes()));
@@ -494,10 +532,10 @@ class ClusterTopologyRefreshUnitTests {
     Requests createClientListRequests(int duration, String response) {
 
         RedisURI redisURI = RedisURI.create("redis://localhost:" + duration);
-        Connections connections = new Connections();
+        Connections connections = new Connections(clientResources, new HashMap<>());
         connections.addConnection(redisURI, connection);
 
-        Requests requests = connections.requestTopology();
+        Requests requests = connections.requestTopology(100, TimeUnit.SECONDS);
         TimedAsyncCommand<String, String, String> command = requests.getRequest(redisURI);
 
         command.getOutput().set(ByteBuffer.wrap(response.getBytes()));

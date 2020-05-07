@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -92,36 +92,6 @@ class TopologyRefreshIntegrationTests extends TestSupport {
         redis1.getStatefulConnection().close();
         redis2.getStatefulConnection().close();
         FastShutdown.shutdown(clusterClient);
-    }
-
-    @Test
-    void shouldUnsubscribeTopologyRefresh() {
-
-        ClusterTopologyRefreshOptions topologyRefreshOptions = ClusterTopologyRefreshOptions.builder()
-                .enablePeriodicRefresh(true) //
-                .build();
-        clusterClient.setOptions(ClusterClientOptions.builder().topologyRefreshOptions(topologyRefreshOptions).build());
-
-        RedisAdvancedClusterAsyncCommands<String, String> clusterConnection = clusterClient.connect().async();
-
-        AtomicBoolean clusterTopologyRefreshActivated = (AtomicBoolean) ReflectionTestUtils.getField(clusterClient,
-                "clusterTopologyRefreshActivated");
-
-        AtomicReference<ScheduledFuture<?>> clusterTopologyRefreshFuture = (AtomicReference) ReflectionTestUtils.getField(
-                clusterClient, "clusterTopologyRefreshFuture");
-
-        assertThat(clusterTopologyRefreshActivated.get()).isTrue();
-        assertThat((Future) clusterTopologyRefreshFuture.get()).isNotNull();
-
-        ScheduledFuture<?> scheduledFuture = clusterTopologyRefreshFuture.get();
-
-        clusterConnection.getStatefulConnection().close();
-
-        FastShutdown.shutdown(clusterClient);
-
-        assertThat(clusterTopologyRefreshActivated.get()).isFalse();
-        assertThat((Future) clusterTopologyRefreshFuture.get()).isNull();
-        assertThat(scheduledFuture.isCancelled()).isTrue();
     }
 
     @Test

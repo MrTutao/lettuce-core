@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -109,37 +109,23 @@ public class ConnectionWatchdog extends ChannelInboundHandlerAdapter {
         this.eventBus = eventBus;
 
         Mono<SocketAddress> wrappedSocketAddressSupplier = socketAddressSupplier.doOnNext(addr -> remoteAddress = addr)
-                .onErrorResume(
-                        t -> {
+                .onErrorResume(t -> {
 
-                            if (logger.isDebugEnabled()) {
-                                logger.warn("Cannot retrieve current address from socketAddressSupplier: " + t.toString()
-                                        + ", reusing cached address " + remoteAddress, t);
-                            } else {
-                                logger.warn("Cannot retrieve current address from socketAddressSupplier: " + t.toString()
-                                        + ", reusing cached address " + remoteAddress);
-                            }
+                    if (logger.isDebugEnabled()) {
+                        logger.warn("Cannot retrieve current address from socketAddressSupplier: " + t.toString()
+                                + ", reusing cached address " + remoteAddress, t);
+                    } else {
+                        logger.warn("Cannot retrieve current address from socketAddressSupplier: " + t.toString()
+                                + ", reusing cached address " + remoteAddress);
+                    }
 
-                            return Mono.just(remoteAddress);
-                        });
+                    return Mono.just(remoteAddress);
+                });
 
         this.reconnectionHandler = new ReconnectionHandler(clientOptions, bootstrap, wrappedSocketAddressSupplier, timer,
                 reconnectWorkers, connectionFacade);
 
         resetReconnectDelay();
-    }
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-
-        logger.debug("{} userEventTriggered(ctx, {})", logPrefix(), evt);
-
-        if (evt instanceof ConnectionEvents.Activated) {
-            attempts = 0;
-            resetReconnectDelay();
-        }
-
-        super.userEventTriggered(ctx, evt);
     }
 
     void prepareClose() {
@@ -163,6 +149,8 @@ public class ConnectionWatchdog extends ChannelInboundHandlerAdapter {
         reconnectScheduleTimeout = null;
         logPrefix = null;
         remoteAddress = channel.remoteAddress();
+        attempts = 0;
+        resetReconnectDelay();
         logPrefix = null;
         logger.debug("{} channelActive()", logPrefix());
 
@@ -300,17 +288,24 @@ public class ConnectionWatchdog extends ChannelInboundHandlerAdapter {
                     return;
                 }
 
-                if (ReconnectionHandler.isExecutionException(t)) {
-                    logger.log(warnLevelToUse, "Cannot reconnect: {}", t.toString());
-                } else {
-                    logger.log(warnLevelToUse, "Cannot reconnect: {}", t.toString(), t);
-                }
-
                 CompletableFuture<SocketAddress> remoteAddressFuture = tuple.getT2();
                 SocketAddress remote = remoteAddress;
                 if (remoteAddressFuture.isDone() && !remoteAddressFuture.isCompletedExceptionally()
                         && !remoteAddressFuture.isCancelled()) {
                     remote = remoteAddressFuture.join();
+                }
+
+                String message = String.format("Cannot reconnect to [%s]: %s", remote,
+                        t.getMessage() != null ? t.getMessage() : t.toString());
+
+                if (ReconnectionHandler.isExecutionException(t)) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(message, t);
+                    } else {
+                        logger.log(warnLevelToUse, message);
+                    }
+                } else {
+                    logger.log(warnLevelToUse, message, t);
                 }
 
                 eventBus.publish(new ReconnectFailedEvent(LocalAddress.ANY, remote, t, attempt));

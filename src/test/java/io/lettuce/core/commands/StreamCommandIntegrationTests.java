@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -181,27 +181,54 @@ public class StreamCommandIntegrationTests extends TestSupport {
     }
 
     @Test
-    void xread() {
+    void xreadSingleStream() {
+
+        redis.xadd("stream-1", Collections.singletonMap("key1", "value1"));
+        redis.xadd("stream-1", Collections.singletonMap("key2", "value2"));
+
+        List<StreamMessage<String, String>> messages = redis.xread(XReadArgs.Builder.count(2),
+                StreamOffset.from("stream-1", "0-0"));
+
+        assertThat(messages).hasSize(2);
+        StreamMessage<String, String> firstMessage = messages.get(0);
+
+        assertThat(firstMessage.getStream()).isEqualTo("stream-1");
+        assertThat(firstMessage.getBody()).hasSize(1).containsEntry("key1", "value1");
+
+        StreamMessage<String, String> nextMessage = messages.get(1);
+
+        assertThat(nextMessage.getStream()).isEqualTo("stream-1");
+        assertThat(nextMessage.getBody()).hasSize(1).containsEntry("key2", "value2");
+    }
+
+    @Test
+    void xreadMultipleStreams() {
+
+        Map<String, String> biggerBody = new LinkedHashMap<>();
+        biggerBody.put("key4", "value4");
+        biggerBody.put("key5", "value5");
 
         String initial1 = redis.xadd("stream-1", Collections.singletonMap("key1", "value1"));
         String initial2 = redis.xadd("stream-2", Collections.singletonMap("key2", "value2"));
         String message1 = redis.xadd("stream-1", Collections.singletonMap("key3", "value3"));
-        String message2 = redis.xadd("stream-2", Collections.singletonMap("key4", "value4"));
+        String message2 = redis.xadd("stream-2", biggerBody);
 
-        List<StreamMessage<String, String>> messages = redis.xread(StreamOffset.from("stream-1", initial1),
-                StreamOffset.from("stream-2", initial2));
+        List<StreamMessage<String, String>> messages = redis.xread(StreamOffset.from("stream-1", "0-0"),
+                StreamOffset.from("stream-2", "0-0"));
+
+        assertThat(messages).hasSize(4);
 
         StreamMessage<String, String> firstMessage = messages.get(0);
 
-        assertThat(firstMessage.getId()).isEqualTo(message1);
+        assertThat(firstMessage.getId()).isEqualTo(initial1);
         assertThat(firstMessage.getStream()).isEqualTo("stream-1");
-        assertThat(firstMessage.getBody()).containsEntry("key3", "value3");
+        assertThat(firstMessage.getBody()).hasSize(1).containsEntry("key1", "value1");
 
-        StreamMessage<String, String> secondMessage = messages.get(1);
+        StreamMessage<String, String> secondMessage = messages.get(3);
 
         assertThat(secondMessage.getId()).isEqualTo(message2);
         assertThat(secondMessage.getStream()).isEqualTo("stream-2");
-        assertThat(secondMessage.getBody()).containsEntry("key4", "value4");
+        assertThat(secondMessage.getBody()).hasSize(2).containsEntry("key4", "value4");
     }
 
     @Test
@@ -256,8 +283,8 @@ public class StreamCommandIntegrationTests extends TestSupport {
     @Test
     void xinfoConsumers() {
 
-        assertThat(redis.xgroupCreate(StreamOffset.from(key, "0-0"), "group", XGroupCreateArgs.Builder.mkstream())).isEqualTo(
-                "OK");
+        assertThat(redis.xgroupCreate(StreamOffset.from(key, "0-0"), "group", XGroupCreateArgs.Builder.mkstream()))
+                .isEqualTo("OK");
         redis.xadd(key, Collections.singletonMap("key1", "value1"));
 
         redis.xreadgroup(Consumer.from("group", "consumer1"), StreamOffset.lastConsumed(key));
@@ -271,8 +298,8 @@ public class StreamCommandIntegrationTests extends TestSupport {
 
         assertThat(redis.xgroupCreate(StreamOffset.latest(key), "group", XGroupCreateArgs.Builder.mkstream())).isEqualTo("OK");
 
-        List<Object> groups = redis.dispatch(XINFO, new NestedMultiOutput<>(StringCodec.UTF8), new CommandArgs<>(
-                StringCodec.UTF8).add("GROUPS").add(key));
+        List<Object> groups = redis.dispatch(XINFO, new NestedMultiOutput<>(StringCodec.UTF8),
+                new CommandArgs<>(StringCodec.UTF8).add("GROUPS").add(key));
 
         assertThat(groups).isNotEmpty();
         assertThat(redis.type(key)).isEqualTo("stream");
@@ -377,6 +404,28 @@ public class StreamCommandIntegrationTests extends TestSupport {
         PendingMessage message = pendingMessages.get(0);
 
         assertThat(message.getMsSinceLastDelivery()).isBetween(50000L, 80000L);
+    }
+
+    @Test
+    void xclaimJustId() {
+
+        String id1 = redis.xadd(key, Collections.singletonMap("key", "value"));
+        redis.xgroupCreate(StreamOffset.latest(key), "group");
+        String id2 = redis.xadd(key, Collections.singletonMap("key", "value"));
+        String id3 = redis.xadd(key, Collections.singletonMap("key", "value"));
+
+        redis.xreadgroup(Consumer.from("group", "consumer1"), StreamOffset.lastConsumed(key));
+
+        List<StreamMessage<String, String>> claimedMessages = redis.xclaim(key, Consumer.from("group", "consumer2"),
+                XClaimArgs.Builder.justid(), id1, id2, id3);
+
+        assertThat(claimedMessages).hasSize(2);
+
+        StreamMessage<String, String> message = claimedMessages.get(0);
+
+        assertThat(message.getBody()).isNull();
+        assertThat(message.getStream()).isEqualTo("key");
+        assertThat(message.getId()).isEqualTo(id2);
     }
 
     @Test

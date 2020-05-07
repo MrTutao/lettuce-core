@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,7 +39,7 @@ import io.lettuce.core.cluster.api.sync.RedisClusterCommands;
 import io.lettuce.core.cluster.models.slots.ClusterSlotRange;
 import io.lettuce.core.cluster.models.slots.ClusterSlotsParser;
 import io.lettuce.test.Delay;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.LettuceExtension;
 import io.lettuce.test.Wait;
 
@@ -76,7 +76,7 @@ class ClusterCommandIntegrationTests extends TestSupport {
 
         RedisFuture<String> future = async.clusterBumpepoch();
 
-        String result = Futures.get(future);
+        String result = TestFutures.getOrTimeout(future);
 
         assertThat(result).matches("(BUMPED|STILL).*");
     }
@@ -119,7 +119,7 @@ class ClusterCommandIntegrationTests extends TestSupport {
 
         sync.set("b", value);
         RedisFuture<Long> replication = async.waitForReplication(1, 5);
-        assertThat(Futures.get(replication)).isGreaterThan(0L);
+        assertThat(TestFutures.getOrTimeout(replication)).isGreaterThan(0L);
     }
 
     @Test
@@ -134,13 +134,13 @@ class ClusterCommandIntegrationTests extends TestSupport {
 
         StatefulRedisClusterConnection<String, String> clusterConnection = clusterClient.connect();
 
-        Futures.await(clusterConnection.async().set("a", "myValue1"));
+        TestFutures.awaitOrTimeout(clusterConnection.async().set("a", "myValue1"));
 
         clusterConnection.reset();
 
         RedisFuture<String> setA = clusterConnection.async().set("a", "myValue1");
 
-        assertThat(Futures.get(setA)).isEqualTo("OK");
+        assertThat(TestFutures.getOrTimeout(setA)).isEqualTo("OK");
         assertThat(setA.getError()).isNull();
 
         connection.close();
@@ -248,7 +248,7 @@ class ClusterCommandIntegrationTests extends TestSupport {
 
         async.set(key, value);
 
-        String resultB = Futures.get(async.get(key));
+        String resultB = TestFutures.getOrTimeout(async.get(key));
         assertThat(resultB).isEqualTo(value);
         Delay.delay(Duration.ofMillis(500)); // give some time to replicate
     }

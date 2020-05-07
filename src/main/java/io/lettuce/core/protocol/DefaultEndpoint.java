@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,11 +51,11 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultEndpoint.class);
     private static final AtomicLong ENDPOINT_COUNTER = new AtomicLong();
-    private static final AtomicIntegerFieldUpdater<DefaultEndpoint> QUEUE_SIZE = AtomicIntegerFieldUpdater.newUpdater(
-            DefaultEndpoint.class, "queueSize");
+    private static final AtomicIntegerFieldUpdater<DefaultEndpoint> QUEUE_SIZE = AtomicIntegerFieldUpdater
+            .newUpdater(DefaultEndpoint.class, "queueSize");
 
-    private static final AtomicIntegerFieldUpdater<DefaultEndpoint> STATUS = AtomicIntegerFieldUpdater.newUpdater(
-            DefaultEndpoint.class, "status");
+    private static final AtomicIntegerFieldUpdater<DefaultEndpoint> STATUS = AtomicIntegerFieldUpdater
+            .newUpdater(DefaultEndpoint.class, "status");
 
     private static final int ST_OPEN = 0;
     private static final int ST_CLOSED = 1;
@@ -77,6 +77,7 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
 
     private String logPrefix;
     private boolean autoFlushCommands = true;
+    private boolean inActivation = false;
 
     private ConnectionWatchdog connectionWatchdog;
     private ConnectionFacade connectionFacade;
@@ -131,10 +132,18 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
 
         LettuceAssert.notNull(command, "Command must not be null");
 
+        RedisException validation = validateWrite(1);
+        if (validation != null) {
+            command.completeExceptionally(validation);
+            return command;
+        }
+
         try {
             sharedLock.incrementWriters();
 
-            validateWrite(1);
+            if (inActivation) {
+                command = processActivationCommand(command);
+            }
 
             if (autoFlushCommands) {
 
@@ -163,10 +172,19 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
 
         LettuceAssert.notNull(commands, "Commands must not be null");
 
+        RedisException validation = validateWrite(commands.size());
+
+        if (validation != null) {
+            commands.forEach(it -> it.completeExceptionally(validation));
+            return (Collection<RedisCommand<K, V, ?>>) commands;
+        }
+
         try {
             sharedLock.incrementWriters();
 
-            validateWrite(commands.size());
+            if (inActivation) {
+                commands = processActivationCommands(commands);
+            }
 
             if (autoFlushCommands) {
 
@@ -189,10 +207,36 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
         return (Collection<RedisCommand<K, V, ?>>) commands;
     }
 
-    private void validateWrite(int commands) {
+    private <K, V, T> RedisCommand<K, V, T> processActivationCommand(RedisCommand<K, V, T> command) {
+
+        if (!ActivationCommand.isActivationCommand(command)) {
+            return new ActivationCommand<>(command);
+        }
+
+        return command;
+    }
+
+    private <K, V> Collection<RedisCommand<K, V, ?>> processActivationCommands(
+            Collection<? extends RedisCommand<K, V, ?>> commands) {
+
+        Collection<RedisCommand<K, V, ?>> commandsToReturn = new ArrayList<>(commands.size());
+
+        for (RedisCommand<K, V, ?> command : commands) {
+
+            if (!ActivationCommand.isActivationCommand(command)) {
+                command = new ActivationCommand<>(command);
+            }
+
+            commandsToReturn.add(command);
+        }
+
+        return commandsToReturn;
+    }
+
+    private RedisException validateWrite(int commands) {
 
         if (isClosed()) {
-            throw new RedisException("Connection is closed");
+            return new RedisException("Connection is closed");
         }
 
         if (usesBoundedQueues()) {
@@ -200,24 +244,26 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
             boolean connected = isConnected();
 
             if (QUEUE_SIZE.get(this) + commands > clientOptions.getRequestQueueSize()) {
-                throw new RedisException("Request queue size exceeded: " + clientOptions.getRequestQueueSize()
+                return new RedisException("Request queue size exceeded: " + clientOptions.getRequestQueueSize()
                         + ". Commands are not accepted until the queue size drops.");
             }
 
             if (!connected && disconnectedBuffer.size() + commands > clientOptions.getRequestQueueSize()) {
-                throw new RedisException("Request queue size exceeded: " + clientOptions.getRequestQueueSize()
+                return new RedisException("Request queue size exceeded: " + clientOptions.getRequestQueueSize()
                         + ". Commands are not accepted until the queue size drops.");
             }
 
             if (connected && commandBuffer.size() + commands > clientOptions.getRequestQueueSize()) {
-                throw new RedisException("Command buffer size exceeded: " + clientOptions.getRequestQueueSize()
+                return new RedisException("Command buffer size exceeded: " + clientOptions.getRequestQueueSize()
                         + ". Commands are not accepted until the queue size drops.");
             }
         }
 
         if (!isConnected() && rejectCommandsWhileDisconnected) {
-            throw new RedisException("Currently not connected. Commands are rejected.");
+            return new RedisException("Currently not connected. Commands are rejected.");
         }
+
+        return null;
     }
 
     private boolean usesBoundedQueues() {
@@ -376,7 +422,12 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
                     logger.debug("{} activating endpoint", logPrefix());
                 }
 
-                connectionFacade.activated();
+                try {
+                    inActivation = true;
+                    connectionFacade.activated();
+                } finally {
+                    inActivation = false;
+                }
 
                 flushCommands(disconnectedBuffer);
             } catch (Exception e) {
@@ -458,7 +509,7 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
             List<RedisCommand<?, ?, ?>> commands = sharedLock.doExclusive(() -> {
 
                 if (queue.isEmpty()) {
-                    return Collections.<RedisCommand<?, ?, ?>> emptyList();
+                    return Collections.emptyList();
                 }
 
                 return drainCommands(queue);
@@ -576,7 +627,8 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
         } else if (reliability == Reliability.AT_MOST_ONCE && rejectCommandsWhileDisconnected) {
 
             RedisException disconnected = new RedisException("Connection disconnected");
-            cancelCommands(disconnected.getMessage(), queuedCommands.drainQueue(), it -> it.completeExceptionally(disconnected));
+            cancelCommands(disconnected.getMessage(), queuedCommands.drainQueue(),
+                    it -> it.completeExceptionally(disconnected));
             cancelCommands(disconnected.getMessage(), drainCommands(), it -> it.completeExceptionally(disconnected));
             return;
         }
@@ -657,7 +709,7 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
         RedisCommand<?, ?, ?> cmd;
         while ((cmd = source.poll()) != null) {
 
-            if (!cmd.isDone()) {
+            if (!cmd.isDone() && !ActivationCommand.isActivationCommand(cmd)) {
                 target.add(cmd);
             }
         }
@@ -964,4 +1016,27 @@ public class DefaultEndpoint implements RedisChannelWriter, Endpoint {
         AT_MOST_ONCE, AT_LEAST_ONCE
     }
 
+    static class ActivationCommand<K, V, T> extends CommandWrapper<K, V, T> {
+
+        public ActivationCommand(RedisCommand<K, V, T> command) {
+            super(command);
+        }
+
+        public static boolean isActivationCommand(RedisCommand<?, ?, ?> command) {
+
+            if (command instanceof ActivationCommand) {
+                return true;
+            }
+
+            while (command instanceof CommandWrapper) {
+                command = ((CommandWrapper<?, ?, ?>) command).getDelegate();
+
+                if (command instanceof ActivationCommand) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 }

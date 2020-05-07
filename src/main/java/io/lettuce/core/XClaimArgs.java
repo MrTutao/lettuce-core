@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,7 @@ import io.lettuce.core.protocol.CommandType;
 /**
  * Argument list builder for the Redis <a href="http://redis.io/commands/xclaim">XCLAIM</a> command. Static import the methods
  * from {@link XClaimArgs.Builder} and call the methods: {@code minIdleTime(…)} .
- * <p/>
+ * <p>
  * {@link XClaimArgs} is a mutable object and instances should be used only once to avoid shared mutable state.
  *
  * @author Mark Paluch
@@ -40,6 +40,7 @@ public class XClaimArgs {
     private Long time;
     private Long retrycount;
     private boolean force;
+    private boolean justid;
 
     /**
      * Builder entry points for {@link XAddArgs}.
@@ -50,6 +51,18 @@ public class XClaimArgs {
          * Utility constructor.
          */
         private Builder() {
+        }
+
+        /**
+         * Creates new {@link XClaimArgs} and set the {@code JUSTID} flag to return just the message id and do not increment the
+         * retry counter. The message body is not returned when calling {@code XCLAIM}.
+         *
+         * @return new {@link XClaimArgs} with min idle time set.
+         * @see XClaimArgs#justid()
+         * @since 5.3
+         */
+        public static XClaimArgs justid() {
+            return new XClaimArgs().justid();
         }
 
         public static XClaimArgs minIdleTime(long milliseconds) {
@@ -68,6 +81,19 @@ public class XClaimArgs {
 
             return minIdleTime(minIdleTime.toMillis());
         }
+    }
+
+    /**
+     * Set the {@code JUSTID} flag to return just the message id and do not increment the retry counter. The message body is not
+     * returned when calling {@code XCLAIM}.
+     *
+     * @return {@code this}.
+     * @since 5.3
+     */
+    public XClaimArgs justid() {
+
+        this.justid = true;
+        return this;
     }
 
     /**
@@ -205,6 +231,10 @@ public class XClaimArgs {
 
         if (force) {
             args.add(CommandKeyword.FORCE);
+        }
+
+        if (justid) {
+            args.add(CommandKeyword.JUSTID);
         }
     }
 }

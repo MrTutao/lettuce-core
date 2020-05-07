@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.lettuce.core;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,15 +23,15 @@ import java.util.List;
 import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.core.protocol.CommandType;
-import io.lettuce.core.protocol.LettuceCharsets;
 import io.lettuce.core.protocol.ProtocolKeyword;
 
 /**
  * Argument list builder for the Redis <a href="http://redis.io/commands/bitfield">BITFIELD</a> command.
- * <p/>
+ * <p>
  * {@link BitFieldArgs} is a mutable object and instances should be used only once to avoid shared mutable state.
  *
  * @author Mark Paluch
+ * @author Ian Pojman
  * @since 4.2
  */
 public class BitFieldArgs implements CompositeArgument {
@@ -444,7 +445,7 @@ public class BitFieldArgs implements CompositeArgument {
             args.add(CommandType.SET).add(bitFieldType.asString());
 
             if (bitOffset) {
-                args.add(String.format("#%d", offset));
+                args.add("#" + offset);
             } else {
                 args.add(offset);
             }
@@ -478,7 +479,7 @@ public class BitFieldArgs implements CompositeArgument {
             args.add(CommandType.GET).add(bitFieldType.asString());
 
             if (bitOffset) {
-                args.add(String.format("#%d", offset));
+                args.add("#" + offset);
             } else {
                 args.add(offset);
             }
@@ -512,7 +513,7 @@ public class BitFieldArgs implements CompositeArgument {
             args.add(CommandType.INCRBY).add(bitFieldType.asString());
 
             if (bitOffset) {
-                args.add(String.format("#%d", offset));
+                args.add("#" + offset);
             } else {
                 args.add(offset);
             }
@@ -565,7 +566,7 @@ public class BitFieldArgs implements CompositeArgument {
         public final byte[] bytes;
 
         OverflowType() {
-            bytes = name().getBytes(LettuceCharsets.ASCII);
+            bytes = name().getBytes(StandardCharsets.US_ASCII);
         }
 
         @Override
@@ -613,7 +614,7 @@ public class BitFieldArgs implements CompositeArgument {
         }
 
         private String asString() {
-            return String.format("%s%d", (signed ? "i" : "u"), bits);
+            return (signed ? "i" : "u") + bits;
         }
 
         @Override
@@ -657,7 +658,7 @@ public class BitFieldArgs implements CompositeArgument {
 
         @Override
         public String toString() {
-            return String.format("%s%d", (multiplyByTypeWidth ? "#" : ""), offset);
+            return (multiplyByTypeWidth ? "#" : "") + offset;
         }
     }
 }

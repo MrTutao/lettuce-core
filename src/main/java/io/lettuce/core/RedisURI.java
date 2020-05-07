@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,19 +20,17 @@ import static io.lettuce.core.LettuceStrings.isNotEmpty;
 
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
 import io.lettuce.core.internal.HostAndPort;
 import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.internal.LettuceSets;
-import io.lettuce.core.protocol.LettuceCharsets;
 
 /**
  * Redis URI. Contains connection details for the Redis/Sentinel connections. You can provide the database, client name,
@@ -54,7 +52,7 @@ import io.lettuce.core.protocol.LettuceCharsets;
  * more options.</li>
  * <li>Construct your own instance:
  * <p>
- * {@code new RedisURI("localhost", 6379, 60, TimeUnit.SECONDS);}
+ * {@code new RedisURI("localhost", 6379, Duration.ofSeconds(60));}
  * </p>
  * or
  * <p>
@@ -66,22 +64,35 @@ import io.lettuce.core.protocol.LettuceCharsets;
  *
  * <h3>URI syntax</h3>
  *
- * <b>Redis Standalone</b> <blockquote> <i>redis</i><b>{@code ://}</b>[<i>password@</i>]<i>host</i> [<b>{@code :} </b>
- * <i>port</i>][<b>{@code /}</b><i>database</i>][<b>{@code ?}</b> [<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]] [
- * <i>&database=database</i>] [<i>&clientName=clientName</i>]] </blockquote>
- *
- * <b>Redis Standalone (SSL)</b> <blockquote> <i>rediss</i><b>{@code ://}</b>[<i>password@</i>]<i>host</i> [<b>{@code :} </b>
- * <i>port</i>][<b>{@code /}</b><i>database</i>][<b>{@code ?}</b> [<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]] [
- * <i>&database=database</i>] [<i>&clientName=clientName</i>]] </blockquote>
- *
- * Redis Standalone (Unix Domain Sockets)</b> <blockquote> <i>redis-socket</i><b>{@code ://} </b>[<i>password@</i>]<i>path</i>[
- * <b>{@code ?}</b>[<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]][<i>&database=database</i>] [<i>&clientName=clientName</i>]]
+ * <b>Redis Standalone</b> <blockquote> <i>redis</i><b>{@code ://}</b>[[<i>username</i>{@code :}]<i>password@</i>]<i>host</i>
+ * [<b>{@code :} </b> <i>port</i>][<b>{@code /}</b><i>database</i>][<b>{@code ?}</b>
+ * [<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]] [ <i>&amp;database=database</i>] [<i>&amp;clientName=clientName</i>]]
  * </blockquote>
  *
- * <b>Redis Sentinel</b> <blockquote> <i>redis-sentinel</i><b>{@code ://}</b>[<i>password@</i>]<i>host1</i> [<b>{@code :} </b>
+ * <b>Redis Standalone (SSL)</b> <blockquote>
+ * <i>rediss</i><b>{@code ://}</b>[[<i>username</i>{@code :}]<i>password@</i>]<i>host</i> [<b>{@code :} </b>
+ * <i>port</i>][<b>{@code /}</b><i>database</i>][<b>{@code ?}</b> [<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]] [
+ * <i>&amp;database=database</i>] [<i>&amp;clientName=clientName</i>]] </blockquote>
+ *
+ * Redis Standalone (Unix Domain Sockets)</b> <blockquote> <i>redis-socket</i><b>{@code ://}
+ * </b>[[<i>username</i>{@code :}]<i>password@</i>]<i>path</i>[
+ * <b>{@code ?}</b>[<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]][<i>&amp;database=database</i>]
+ * [<i>&amp;clientName=clientName</i>]] </blockquote>
+ *
+ * <b>Redis Sentinel</b> <blockquote>
+ * <i>redis-sentinel</i><b>{@code ://}</b>[[<i>username</i>{@code :}]<i>password@</i>]<i>host1</i> [<b>{@code :} </b>
  * <i>port1</i>][, <i>host2</i> [<b>{@code :}</b><i>port2</i>]][, <i>hostN</i> [<b>{@code :}</b><i>portN</i>]][<b>{@code /} </b>
  * <i>database</i>][<b>{@code ?} </b>[<i>timeout=timeout</i>[<i>d|h|m|s|ms|us|ns</i>]] [
- * <i>&sentinelMasterId=sentinelMasterId</i>] [<i>&database=database</i>] [<i>&clientName=clientName</i>]] </blockquote>
+ * <i>&amp;sentinelMasterId=sentinelMasterId</i>] [<i>&amp;database=database</i>] [<i>&amp;clientName=clientName</i>]]
+ * </blockquote>
+ *
+ * <p>
+ * Note: When using Redis Sentinel, the password from the URI applies to the data nodes only. Sentinel authentication must be
+ * configured for each {@link #getSentinels() sentinel node}.
+ * </p>
+ * <p>
+ * Note:Usernames are supported as of Redis 6.
+ * </p>
  *
  * <p>
  * <b>Schemes</b>
@@ -114,6 +125,7 @@ import io.lettuce.core.protocol.LettuceCharsets;
  * RedisURI supports Redis Standalone, Redis Sentinel and Redis Cluster with plain, SSL, TLS and unix domain socket connections.
  *
  * @author Mark Paluch
+ * @author Guy Korland
  * @since 3.0
  */
 @SuppressWarnings("serial")
@@ -133,18 +145,18 @@ public class RedisURI implements Serializable, ConnectionPoint {
     public static final String PARAMETER_NAME_SENTINEL_MASTER_ID = "sentinelMasterId";
     public static final String PARAMETER_NAME_CLIENT_NAME = "clientName";
 
-    public static final Map<String, TimeUnit> TIME_UNIT_MAP;
+    public static final Map<String, LongFunction<Duration>> CONVERTER_MAP;
 
     static {
-        Map<String, TimeUnit> unitMap = new HashMap<String, TimeUnit>();
-        unitMap.put("ns", TimeUnit.NANOSECONDS);
-        unitMap.put("us", TimeUnit.MICROSECONDS);
-        unitMap.put("ms", TimeUnit.MILLISECONDS);
-        unitMap.put("s", TimeUnit.SECONDS);
-        unitMap.put("m", TimeUnit.MINUTES);
-        unitMap.put("h", TimeUnit.HOURS);
-        unitMap.put("d", TimeUnit.DAYS);
-        TIME_UNIT_MAP = Collections.unmodifiableMap(unitMap);
+        Map<String, LongFunction<Duration>> unitMap = new HashMap<>();
+        unitMap.put("ns", Duration::ofNanos);
+        unitMap.put("us", us -> Duration.ofNanos(us * 1000));
+        unitMap.put("ms", Duration::ofMillis);
+        unitMap.put("s", Duration::ofSeconds);
+        unitMap.put("m", Duration::ofMinutes);
+        unitMap.put("h", Duration::ofHours);
+        unitMap.put("d", Duration::ofDays);
+        CONVERTER_MAP = Collections.unmodifiableMap(unitMap);
     }
 
     /**
@@ -161,7 +173,6 @@ public class RedisURI implements Serializable, ConnectionPoint {
      * Default timeout: 60 sec
      */
     public static final long DEFAULT_TIMEOUT = 60;
-    public static final TimeUnit DEFAULT_TIMEOUT_UNIT = TimeUnit.SECONDS;
     public static final Duration DEFAULT_TIMEOUT_DURATION = Duration.ofSeconds(DEFAULT_TIMEOUT);
 
     private String host;
@@ -170,6 +181,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
     private int port;
     private int database;
     private String clientName;
+    private String username;
     private char[] password;
     private boolean ssl = false;
     private boolean verifyPeer = true;
@@ -200,23 +212,6 @@ public class RedisURI implements Serializable, ConnectionPoint {
         setHost(host);
         setPort(port);
         setTimeout(timeout);
-    }
-
-    /**
-     * Constructor with host/port and timeout.
-     *
-     * @param host the host
-     * @param port the port
-     * @param timeout timeout value
-     * @param unit unit of the timeout value
-     * @deprecated since 5.0, use {@link #RedisURI(String, int, Duration)}
-     */
-    @Deprecated
-    public RedisURI(String host, int port, long timeout, TimeUnit unit) {
-
-        setHost(host);
-        setPort(port);
-        setTimeout(Duration.ofNanos(unit.toNanos(timeout)));
     }
 
     /**
@@ -337,6 +332,26 @@ public class RedisURI implements Serializable, ConnectionPoint {
     }
 
     /**
+     * Returns the username.
+     *
+     * @return the username
+     * @since 6.0
+     */
+    public String getUsername() {
+        return username;
+    }
+
+    /**
+     * Sets the username.
+     *
+     * @param username the username, must not be {@literal null}.
+     * @since 6.0
+     */
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    /**
      * Returns the password.
      *
      * @return the password
@@ -349,7 +364,9 @@ public class RedisURI implements Serializable, ConnectionPoint {
      * Sets the password. Use empty string to skip authentication.
      *
      * @param password the password, must not be {@literal null}.
+     * @deprecated since 6.0. Use {@link #setPassword(CharSequence)} or {@link #setPassword(char[])} avoid String caching.
      */
+    @Deprecated
     public void setPassword(String password) {
         setPassword((CharSequence) password);
     }
@@ -389,7 +406,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
     }
 
     /**
-     * Sets the command timeout for synchronous command execution.
+     * Sets the command timeout for synchronous command execution. A zero timeout value indicates to not time out.
      *
      * @param timeout the command timeout for synchronous command execution.
      * @since 5.0
@@ -510,11 +527,23 @@ public class RedisURI implements Serializable, ConnectionPoint {
     }
 
     /**
-     * Creates an URI based on the RedisURI.
+     * Creates an URI based on the RedisURI if possible.
+     * <p>
+     * An URI an represent a Standalone address using host and port or socket addressing or a Redis Sentinel address using
+     * host/port. A Redis Sentinel URI with multiple nodes using Unix Domain Sockets cannot be rendered to a {@link URI}.
      *
-     * @return URI based on the RedisURI
+     * @return URI based on the RedisURI.
+     * @throws IllegalStateException if the URI cannot be rendered.
      */
     public URI toURI() {
+        try {
+            return URI.create(createUriString());
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot render URI for " + toString(), e);
+        }
+    }
+
+    private String createUriString() {
         String scheme = getScheme();
         String authority = getAuthority(scheme);
         String queryString = getQueryString();
@@ -523,8 +552,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
         if (!queryString.isEmpty()) {
             uri += "?" + queryString;
         }
-
-        return URI.create(uri);
+        return uri;
     }
 
     private static RedisURI buildRedisUriFromUri(URI uri) {
@@ -547,17 +575,23 @@ public class RedisURI implements Serializable, ConnectionPoint {
 
         if (isNotEmpty(userInfo)) {
             String password = userInfo;
+            String username = null;
             if (password.startsWith(":")) {
                 password = password.substring(1);
             } else {
 
                 int index = password.indexOf(':');
                 if (index > 0) {
+                    username = password.substring(0, index);
                     password = password.substring(index + 1);
                 }
             }
-            if (password != null && !password.equals("")) {
-                builder.withPassword(password);
+            if (LettuceStrings.isNotEmpty(password)) {
+                if (username == null) {
+                    builder.withPassword(password);
+                } else {
+                    builder.withAuthentication(username, password);
+                }
             }
         }
 
@@ -600,7 +634,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
         return builder.build();
     }
 
-    private String getAuthority(final String scheme) {
+    private String getAuthority(String scheme) {
 
         String authority = null;
 
@@ -614,17 +648,28 @@ public class RedisURI implements Serializable, ConnectionPoint {
 
         if (sentinels.size() != 0) {
 
-            authority = sentinels.stream()
-                    .map(redisURI -> urlEncode(redisURI.getHost()) + getPortPart(redisURI.getPort(), scheme))
-                    .collect(Collectors.joining(","));
+            authority = sentinels.stream().map(redisURI -> {
+                if (LettuceStrings.isNotEmpty(redisURI.getSocket())) {
+                    return String.format("[Socket %s]", redisURI.getSocket());
+                }
+
+                return urlEncode(redisURI.getHost()) + getPortPart(redisURI.getPort(), scheme);
+            }).collect(Collectors.joining(","));
         }
 
         if (socket != null) {
             authority = urlEncode(socket);
+        } else {
+            if (database != 0) {
+                authority += "/" + database;
+            }
         }
 
         if (password != null && password.length != 0) {
             authority = urlEncode(new String(password)) + "@" + authority;
+        }
+        if (username != null) {
+            authority = urlEncode(username) + ":" + authority;
         }
         return authority;
     }
@@ -633,7 +678,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
 
         List<String> queryPairs = new ArrayList<>();
 
-        if (database != 0) {
+        if (database != 0 && LettuceStrings.isNotEmpty(socket)) {
             queryPairs.add(PARAMETER_NAME_DATABASE + "=" + database);
         }
 
@@ -648,9 +693,9 @@ public class RedisURI implements Serializable, ConnectionPoint {
         if (timeout.getSeconds() != DEFAULT_TIMEOUT) {
 
             if (timeout.getNano() == 0) {
-                queryPairs.add(PARAMETER_NAME_TIMEOUT + "=" + timeout.getSeconds() + toQueryParamUnit(TimeUnit.SECONDS));
+                queryPairs.add(PARAMETER_NAME_TIMEOUT + "=" + timeout.getSeconds() + "s");
             } else {
-                queryPairs.add(PARAMETER_NAME_TIMEOUT + "=" + timeout.toMillis() + toQueryParamUnit(TimeUnit.MILLISECONDS));
+                queryPairs.add(PARAMETER_NAME_TIMEOUT + "=" + timeout.toMillis() + "ns");
             }
         }
 
@@ -695,71 +740,26 @@ public class RedisURI implements Serializable, ConnectionPoint {
         return scheme;
     }
 
-    private String toQueryParamUnit(TimeUnit unit) {
-
-        for (Map.Entry<String, TimeUnit> entry : TIME_UNIT_MAP.entrySet()) {
-            if (entry.getValue().equals(unit)) {
-                return entry.getKey();
-            }
-        }
-        return "";
-    }
-
     /**
-     * URL encode the {@code str} without slash escaping {@code %2F}
+     * URL encode the {@code str} without slash escaping {@code %2F}.
      *
-     * @param str
+     * @param str the string to encode.
      * @return the URL-encoded string
      */
-    private String urlEncode(String str) {
+    private static String urlEncode(String str) {
         try {
-            return URLEncoder.encode(str, LettuceCharsets.UTF8.name()).replaceAll("%2F", "/");
+            return URLEncoder.encode(str, StandardCharsets.UTF_8.name()).replaceAll("%2F", "/");
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException(e);
         }
     }
 
     /**
-     *
-     * @return the resolved {@link SocketAddress} based either on host/port or the socket.
+     * @return the RedisURL in a URI-like form.
      */
-    public SocketAddress getResolvedAddress() {
-
-        if (getSocket() != null) {
-
-            if (KqueueProvider.isAvailable()) {
-                return KqueueProvider.newSocketAddress(getSocket());
-            }
-
-            return EpollProvider.newSocketAddress(getSocket());
-        }
-
-        return new InetSocketAddress(host, port);
-    }
-
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append(getClass().getSimpleName());
-
-        sb.append(" [");
-
-        if (host != null) {
-            sb.append("host='").append(host).append('\'');
-            sb.append(", port=").append(port);
-        }
-
-        if (socket != null) {
-            sb.append("socket='").append(socket).append('\'');
-        }
-
-        if (sentinelMasterId != null) {
-            sb.append("sentinels=").append(getSentinels());
-            sb.append(", sentinelMasterId=").append(sentinelMasterId);
-        }
-
-        sb.append(']');
-        return sb.toString();
+        return createUriString();
     }
 
     @Override
@@ -811,7 +811,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
 
         if (numbersEnd == 0) {
             if (timeoutString.startsWith("-")) {
-                builder.withTimeout(0, TimeUnit.MILLISECONDS);
+                builder.withTimeout(Duration.ZERO);
             } else {
                 // no-op, leave defaults
             }
@@ -821,12 +821,12 @@ public class RedisURI implements Serializable, ConnectionPoint {
             builder.withTimeout(Duration.ofMillis(timeoutValue));
 
             String suffix = timeoutString.substring(numbersEnd);
-            TimeUnit timeoutUnit = TIME_UNIT_MAP.get(suffix);
-            if (timeoutUnit == null) {
-                timeoutUnit = TimeUnit.MILLISECONDS;
+            LongFunction<Duration> converter = CONVERTER_MAP.get(suffix);
+            if (converter == null) {
+                converter = Duration::ofMillis;
             }
 
-            builder.withTimeout(timeoutValue, timeoutUnit);
+            builder.withTimeout(converter.apply(timeoutValue));
         }
     }
 
@@ -909,6 +909,8 @@ public class RedisURI implements Serializable, ConnectionPoint {
             }
         }
 
+        LettuceAssert.notNull(builder, "Invalid URI, cannot get host or socket part");
+
         if (URI_SCHEME_REDIS_SECURE.equals(uri.getScheme()) || URI_SCHEME_REDIS_SECURE_ALT.equals(uri.getScheme())) {
             builder.withSsl(true);
         }
@@ -939,7 +941,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
                 authority = authority.substring(authority.indexOf('@') + 1);
             }
 
-            String[] hosts = authority.split("\\,");
+            String[] hosts = authority.split(",");
             for (String host : hosts) {
                 HostAndPort hostAndPort = HostAndPort.parse(host);
                 if (builder == null) {
@@ -958,6 +960,8 @@ public class RedisURI implements Serializable, ConnectionPoint {
             }
         }
 
+        LettuceAssert.notNull(builder, "Invalid URI, cannot get host part");
+
         if (isNotEmpty(masterId)) {
             builder.withSentinelMasterId(masterId);
         }
@@ -966,7 +970,6 @@ public class RedisURI implements Serializable, ConnectionPoint {
             builder.withSsl(true);
         }
 
-        LettuceAssert.notNull(builder, "Invalid URI, cannot get host part");
         return builder;
     }
 
@@ -982,9 +985,10 @@ public class RedisURI implements Serializable, ConnectionPoint {
         private String host;
         private String socket;
         private String sentinelMasterId;
-        private int port;
+        private int port = DEFAULT_REDIS_PORT;
         private int database;
         private String clientName;
+        private String username;
         private char[] password;
         private char[] sentinelPassword;
         private boolean ssl = false;
@@ -1276,14 +1280,51 @@ public class RedisURI implements Serializable, ConnectionPoint {
         /**
          * Configures authentication.
          *
-         * @param password the password
+         * @param username the user name
+         * @param password the password name
          * @return the builder
          */
+        public Builder withAuthentication(String username, CharSequence password) {
+
+            LettuceAssert.notNull(username, "User name must not be null");
+            LettuceAssert.notNull(password, "Password must not be null");
+
+            this.username = username;
+            return withPassword(password);
+        }
+
+        /**
+         * Configures authentication.
+         *
+         * @param password the password
+         * @return the builder
+         * @deprecated since 6.0. Use {@link #withPassword(CharSequence)} or {@link #withPassword(char[])} avoid String caching.
+         */
+        @Deprecated
         public Builder withPassword(String password) {
 
             LettuceAssert.notNull(password, "Password must not be null");
 
             return withPassword(password.toCharArray());
+        }
+
+        /**
+         * Configures authentication.
+         *
+         * @param password the password
+         * @return the builder
+         * @since 6.0
+         */
+        public Builder withPassword(CharSequence password) {
+
+            LettuceAssert.notNull(password, "Password must not be null");
+
+            char[] chars = new char[password.length()];
+            for (int i = 0; i < password.length(); i++) {
+                chars[i] = password.charAt(i);
+            }
+
+            return withPassword(chars);
         }
 
         /**
@@ -1317,23 +1358,6 @@ public class RedisURI implements Serializable, ConnectionPoint {
         }
 
         /**
-         * Configures a timeout.
-         *
-         * @param timeout must be greater or equal 0.
-         * @param unit the timeout time unit.
-         * @return the builder
-         * @deprecated since 5.0, use {@link #withTimeout(Duration)}.
-         */
-        @Deprecated
-        public Builder withTimeout(long timeout, TimeUnit unit) {
-
-            LettuceAssert.notNull(unit, "TimeUnit must not be null");
-            LettuceAssert.isTrue(timeout >= 0, "Timeout must be greater or equal 0");
-
-            return withTimeout(Duration.ofNanos(unit.toNanos(timeout)));
-        }
-
-        /**
          * Configures a sentinel master Id.
          *
          * @param sentinelMasterId sentinel master id, must not be empty or {@literal null}
@@ -1360,6 +1384,10 @@ public class RedisURI implements Serializable, ConnectionPoint {
             RedisURI redisURI = new RedisURI();
             redisURI.setHost(host);
             redisURI.setPort(port);
+
+            if (username != null) {
+                redisURI.setUsername(username);
+            }
 
             if (password != null) {
                 redisURI.setPassword(password);

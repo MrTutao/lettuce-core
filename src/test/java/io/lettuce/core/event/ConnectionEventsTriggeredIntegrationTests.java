@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.TestSupport;
 import io.lettuce.core.event.connection.ConnectionEvent;
+import io.lettuce.test.resource.FastShutdown;
 import io.lettuce.test.resource.TestClientResources;
 
 /**
@@ -49,6 +50,6 @@ class ConnectionEventsTriggeredIntegrationTests extends TestSupport {
             assertThat(event.toString()).contains("->");
         }).expectNextCount(3).thenCancel().verify(Duration.of(5, ChronoUnit.SECONDS));
 
-        client.shutdown();
+        FastShutdown.shutdown(client);
     }
 }

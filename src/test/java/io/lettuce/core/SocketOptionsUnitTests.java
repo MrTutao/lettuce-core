@@ -1,11 +1,11 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 /**
+ * Unit tests for {@link SocketOptions}.
+ *
  * @author Mark Paluch
  */
 class SocketOptionsUnitTests {
@@ -38,9 +40,24 @@ class SocketOptionsUnitTests {
         SocketOptions sut = SocketOptions.builder().connectTimeout(1, TimeUnit.MINUTES).keepAlive(true).tcpNoDelay(true)
                 .build();
 
-        assertThat(sut.isKeepAlive()).isEqualTo(true);
-        assertThat(sut.isTcpNoDelay()).isEqualTo(true);
+        assertThat(sut.isKeepAlive()).isTrue();
+        assertThat(sut.isTcpNoDelay()).isTrue();
         assertThat(sut.getConnectTimeout()).isEqualTo(Duration.ofMinutes(1));
+    }
+
+    @Test
+    void mutateShouldConfigureNewOptions() {
+
+        SocketOptions sut = SocketOptions.builder().connectTimeout(Duration.ofSeconds(1)).keepAlive(true).tcpNoDelay(true)
+                .build();
+
+        SocketOptions reconfigured = sut.mutate().tcpNoDelay(false).build();
+
+        assertThat(sut.isKeepAlive()).isTrue();
+        assertThat(sut.isTcpNoDelay()).isTrue();
+        assertThat(sut.getConnectTimeout()).isEqualTo(Duration.ofSeconds(1));
+
+        assertThat(reconfigured.isTcpNoDelay()).isFalse();
     }
 
     @Test
@@ -49,8 +66,8 @@ class SocketOptionsUnitTests {
     }
 
     void checkAssertions(SocketOptions sut) {
-        assertThat(sut.isKeepAlive()).isEqualTo(false);
-        assertThat(sut.isTcpNoDelay()).isEqualTo(false);
+        assertThat(sut.isKeepAlive()).isFalse();
+        assertThat(sut.isTcpNoDelay()).isFalse();
         assertThat(sut.getConnectTimeout()).isEqualTo(Duration.ofSeconds(10));
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2019 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,8 @@ import rx.Single;
 import io.reactivex.Maybe;
 
 /**
+ * Unit tests for {@link ReactiveTypeAdapters} via {@link ConversionService}.
+ *
  * @author Mark Paluch
  */
 class ReactiveTypeAdaptersUnitTests {
@@ -147,6 +149,107 @@ class ReactiveTypeAdaptersUnitTests {
     void toWrapperShouldConvertRxJava2ObservableToPublisher() {
 
         io.reactivex.Observable<String> foo = io.reactivex.Observable.just("foo");
+        assertThat(conversionService.convert(foo, Publisher.class)).isInstanceOf(Publisher.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertMonoToRxJava3Single() {
+
+        Mono<String> foo = Mono.just("foo");
+        assertThat(conversionService.convert(foo, io.reactivex.rxjava3.core.Single.class))
+                .isInstanceOf(io.reactivex.rxjava3.core.Single.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3SingleToMono() {
+
+        io.reactivex.rxjava3.core.Single<String> foo = io.reactivex.rxjava3.core.Single.just("foo");
+        assertThat(conversionService.convert(foo, Mono.class)).isInstanceOf(Mono.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3SingleToPublisher() {
+
+        io.reactivex.rxjava3.core.Single<String> foo = io.reactivex.rxjava3.core.Single.just("foo");
+        assertThat(conversionService.convert(foo, Publisher.class)).isInstanceOf(Publisher.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3MaybeToMono() {
+
+        io.reactivex.rxjava3.core.Maybe<String> foo = io.reactivex.rxjava3.core.Maybe.just("foo");
+        assertThat(conversionService.convert(foo, Mono.class)).isInstanceOf(Mono.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3MaybeToFlux() {
+
+        io.reactivex.rxjava3.core.Maybe<String> foo = io.reactivex.rxjava3.core.Maybe.just("foo");
+        assertThat(conversionService.convert(foo, Flux.class)).isInstanceOf(Flux.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3MaybeToPublisher() {
+
+        io.reactivex.rxjava3.core.Maybe<String> foo = io.reactivex.rxjava3.core.Maybe.just("foo");
+        assertThat(conversionService.convert(foo, Publisher.class)).isInstanceOf(Publisher.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3FlowableToMono() {
+
+        io.reactivex.rxjava3.core.Flowable<String> foo = io.reactivex.rxjava3.core.Flowable.just("foo");
+        assertThat(conversionService.convert(foo, Mono.class)).isInstanceOf(Mono.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3FlowableToFlux() {
+
+        io.reactivex.rxjava3.core.Flowable<String> foo = io.reactivex.rxjava3.core.Flowable.just("foo");
+        assertThat(conversionService.convert(foo, Flux.class)).isInstanceOf(Flux.class);
+    }
+
+    @Test
+    void toWrapperShouldCastRxJava3FlowableToPublisher() {
+
+        io.reactivex.rxjava3.core.Flowable<String> foo = io.reactivex.rxjava3.core.Flowable.just("foo");
+        assertThat(conversionService.convert(foo, Publisher.class)).isInstanceOf(Publisher.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3ObservableToMono() {
+
+        io.reactivex.rxjava3.core.Observable<String> foo = io.reactivex.rxjava3.core.Observable.just("foo");
+        assertThat(conversionService.convert(foo, Mono.class)).isInstanceOf(Mono.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3ObservableToFlux() {
+
+        io.reactivex.rxjava3.core.Observable<String> foo = io.reactivex.rxjava3.core.Observable.just("foo");
+        assertThat(conversionService.convert(foo, Flux.class)).isInstanceOf(Flux.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3ObservableToSingle() {
+
+        io.reactivex.rxjava3.core.Observable<String> foo = io.reactivex.rxjava3.core.Observable.just("foo");
+        assertThat(conversionService.convert(foo, io.reactivex.rxjava3.core.Single.class))
+                .isInstanceOf(io.reactivex.rxjava3.core.Single.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3ObservableToMaybe() {
+
+        io.reactivex.rxjava3.core.Observable<String> foo = io.reactivex.rxjava3.core.Observable.empty();
+        assertThat(conversionService.convert(foo, io.reactivex.rxjava3.core.Maybe.class))
+                .isInstanceOf(io.reactivex.rxjava3.core.Maybe.class);
+    }
+
+    @Test
+    void toWrapperShouldConvertRxJava3ObservableToPublisher() {
+
+        io.reactivex.rxjava3.core.Observable<String> foo = io.reactivex.rxjava3.core.Observable.just("foo");
         assertThat(conversionService.convert(foo, Publisher.class)).isInstanceOf(Publisher.class);
     }
 

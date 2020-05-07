@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -209,9 +209,9 @@ abstract class TypeWrapper {
                 return this.provider;
             }
 
-            if (Type.class == method.getReturnType() && args == null) {
+            if (Type.class == method.getReturnType()) {
                 return forTypeProvider(new MethodInvokeTypeProvider(this.provider, method, -1));
-            } else if (Type[].class == method.getReturnType() && args == null) {
+            } else if (Type[].class == method.getReturnType()) {
                 Type[] result = new Type[((Type[]) method.invoke(this.provider.getType(), args)).length];
                 for (int i = 0; i < result.length; i++) {
                     result[i] = forTypeProvider(new MethodInvokeTypeProvider(this.provider, method, i));

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.Future;
 
@@ -37,10 +37,10 @@ class DefaultEventLoopGroupProviderUnitTests {
         NioEventLoopGroup eventLoopGroup = sut.allocate(NioEventLoopGroup.class);
 
         Future<Boolean> shutdown = sut.release(eventLoopGroup, 10, 10, TimeUnit.MILLISECONDS);
-        Futures.await(shutdown);
+        TestFutures.awaitOrTimeout(shutdown);
 
         Future<Boolean> shutdown2 = sut.release(eventLoopGroup, 10, 10, TimeUnit.MILLISECONDS);
-        Futures.await(shutdown2);
+        TestFutures.awaitOrTimeout(shutdown2);
     }
 
     @Test
@@ -48,7 +48,7 @@ class DefaultEventLoopGroupProviderUnitTests {
 
         DefaultEventLoopGroupProvider sut = new DefaultEventLoopGroupProvider(1);
 
-        Futures.await(sut.shutdown(10, 10, TimeUnit.MILLISECONDS));
+        TestFutures.awaitOrTimeout(sut.shutdown(10, 10, TimeUnit.MILLISECONDS));
         assertThatThrownBy(() -> sut.allocate(NioEventLoopGroup.class)).isInstanceOf(IllegalStateException.class);
     }
 }

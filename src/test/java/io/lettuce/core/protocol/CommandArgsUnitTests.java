@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,13 @@ package io.lettuce.core.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 
 import io.lettuce.core.codec.ByteArrayCodec;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -32,12 +33,10 @@ import io.netty.buffer.Unpooled;
  */
 class CommandArgsUnitTests {
 
-    private Utf8StringCodec codec = new Utf8StringCodec();
-
     @Test
     void getFirstIntegerShouldReturnNull() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add("foo");
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add("foo");
 
         assertThat(CommandArgsAccessor.getFirstInteger(args)).isNull();
     }
@@ -45,7 +44,8 @@ class CommandArgsUnitTests {
     @Test
     void getFirstIntegerShouldReturnFirstInteger() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add(1L).add(127).add(128).add(129).add(0).add(-1);
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(1L).add(127).add(128).add(129).add(0)
+                .add(-1);
 
         assertThat(CommandArgsAccessor.getFirstInteger(args)).isEqualTo(1L);
     }
@@ -53,7 +53,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstIntegerShouldReturnFirstNegativeInteger() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add(-1L).add(-127).add(-128).add(-129);
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(-1L).add(-127).add(-128).add(-129);
 
         assertThat(CommandArgsAccessor.getFirstInteger(args)).isEqualTo(-1L);
     }
@@ -61,7 +61,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstStringShouldReturnNull() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add(1);
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(1);
 
         assertThat(CommandArgsAccessor.getFirstString(args)).isNull();
     }
@@ -69,7 +69,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstStringShouldReturnFirstString() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add("one").add("two");
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add("one").add("two");
 
         assertThat(CommandArgsAccessor.getFirstString(args)).isEqualTo("one");
     }
@@ -77,7 +77,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstCharArrayShouldReturnCharArray() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add(1L).add("two".toCharArray());
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(1L).add("two".toCharArray());
 
         assertThat(CommandArgsAccessor.getFirstCharArray(args)).isEqualTo("two".toCharArray());
     }
@@ -85,7 +85,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstCharArrayShouldReturnNull() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add(1L);
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(1L);
 
         assertThat(CommandArgsAccessor.getFirstCharArray(args)).isNull();
     }
@@ -93,7 +93,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstEncodedKeyShouldReturnNull() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add(1L);
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add(1L);
 
         assertThat(CommandArgsAccessor.getFirstString(args)).isNull();
     }
@@ -101,7 +101,7 @@ class CommandArgsUnitTests {
     @Test
     void getFirstEncodedKeyShouldReturnFirstKey() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).addKey("one").addKey("two");
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).addKey("one").addKey("two");
 
         assertThat(CommandArgsAccessor.encodeFirstKey(args)).isEqualTo(ByteBuffer.wrap("one".getBytes()));
     }
@@ -109,7 +109,7 @@ class CommandArgsUnitTests {
     @Test
     void addValues() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).addValues(Arrays.asList("1", "2"));
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).addValues(Arrays.asList("1", "2"));
 
         ByteBuf buffer = Unpooled.buffer();
         args.encode(buffer);
@@ -117,13 +117,13 @@ class CommandArgsUnitTests {
         ByteBuf expected = Unpooled.buffer();
         expected.writeBytes(("$1\r\n" + "1\r\n" + "$1\r\n" + "2\r\n").getBytes());
 
-        assertThat(buffer.toString(LettuceCharsets.ASCII)).isEqualTo(expected.toString(LettuceCharsets.ASCII));
+        assertThat(buffer.toString(StandardCharsets.US_ASCII)).isEqualTo(expected.toString(StandardCharsets.US_ASCII));
     }
 
     @Test
     void addByte() {
 
-        CommandArgs<String, String> args = new CommandArgs<>(codec).add("one".getBytes());
+        CommandArgs<String, String> args = new CommandArgs<>(StringCodec.UTF8).add("one".getBytes());
 
         ByteBuf buffer = Unpooled.buffer();
         args.encode(buffer);
@@ -131,7 +131,7 @@ class CommandArgsUnitTests {
         ByteBuf expected = Unpooled.buffer();
         expected.writeBytes(("$3\r\n" + "one\r\n").getBytes());
 
-        assertThat(buffer.toString(LettuceCharsets.ASCII)).isEqualTo(expected.toString(LettuceCharsets.ASCII));
+        assertThat(buffer.toString(StandardCharsets.US_ASCII)).isEqualTo(expected.toString(StandardCharsets.US_ASCII));
     }
 
     @Test
@@ -145,7 +145,7 @@ class CommandArgsUnitTests {
         ByteBuf expected = Unpooled.buffer();
         expected.writeBytes(("$3\r\n" + "one\r\n").getBytes());
 
-        assertThat(buffer.toString(LettuceCharsets.ASCII)).isEqualTo(expected.toString(LettuceCharsets.ASCII));
+        assertThat(buffer.toString(StandardCharsets.US_ASCII)).isEqualTo(expected.toString(StandardCharsets.US_ASCII));
     }
 
     @Test
@@ -159,7 +159,7 @@ class CommandArgsUnitTests {
         ByteBuf expected = Unpooled.buffer();
         expected.writeBytes(("$3\r\n" + "one\r\n").getBytes());
 
-        assertThat(buffer.toString(LettuceCharsets.ASCII)).isEqualTo(expected.toString(LettuceCharsets.ASCII));
+        assertThat(buffer.toString(StandardCharsets.US_ASCII)).isEqualTo(expected.toString(StandardCharsets.US_ASCII));
     }
 
     @Test
@@ -173,6 +173,6 @@ class CommandArgsUnitTests {
         ByteBuf expected = Unpooled.buffer();
         expected.writeBytes(("$3\r\n" + "one\r\n").getBytes());
 
-        assertThat(buffer.toString(LettuceCharsets.ASCII)).isEqualTo(expected.toString(LettuceCharsets.ASCII));
+        assertThat(buffer.toString(StandardCharsets.US_ASCII)).isEqualTo(expected.toString(StandardCharsets.US_ASCII));
     }
 }

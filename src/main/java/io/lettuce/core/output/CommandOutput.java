@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -76,12 +76,45 @@ public abstract class CommandOutput<K, V, T> {
     }
 
     /**
+     * Set the command output to a big number. Concrete {@link CommandOutput} implementations can override this method unless
+     * they only receive an integer value which cannot be null.
+     *
+     * @param bytes The command output, or null.
+     * @since 6.0/RESP 3
+     */
+    public void setBigNumber(ByteBuffer bytes) {
+        set(bytes);
+    }
+
+    /**
      * Set the command output to a 64-bit signed integer. Concrete {@link CommandOutput} implementations must override this
      * method unless they only receive a byte array value.
      *
      * @param integer The command output.
      */
     public void set(long integer) {
+        throw new IllegalStateException();
+    }
+
+    /**
+     * Set the command output to a floating-point number. Concrete {@link CommandOutput} implementations must override this
+     * method unless they only receive a byte array value.
+     *
+     * @param number The command output.
+     * @since 6.0/RESP 3
+     */
+    public void set(double number) {
+        throw new IllegalStateException();
+    }
+
+    /**
+     * Set the command output to a boolean. Concrete {@link CommandOutput} implementations must override this method unless they
+     * only receive a byte array value.
+     *
+     * @param value The command output.
+     * @since 6.0/RESP 3
+     */
+    public void set(boolean value) {
         throw new IllegalStateException();
     }
 
@@ -160,5 +193,45 @@ public abstract class CommandOutput<K, V, T> {
      */
     public void multi(int count) {
 
+    }
+
+    /**
+     * Mark the beginning of a multi sequence (array).
+     *
+     * @param count expected number of elements in this multi sequence.
+     * @since 6.0/RESP 3
+     */
+    public void multiArray(int count) {
+        multi(count);
+    }
+
+    /**
+     * Mark the beginning of a multi sequence (push-array).
+     *
+     * @param count expected number of elements in this multi sequence.
+     * @since 6.0/RESP 3
+     */
+    public void multiPush(int count) {
+        multi(count);
+    }
+
+    /**
+     * Mark the beginning of a multi sequence (map).
+     *
+     * @param count expected number of elements in this multi sequence.
+     * @since 6.0/RESP 3
+     */
+    public void multiMap(int count) {
+        multi(count * 2);
+    }
+
+    /**
+     * Mark the beginning of a set.
+     *
+     * @param count expected number of elements in this multi sequence.
+     * @since 6.0/RESP 3
+     */
+    public void multiSet(int count) {
+        multi(count);
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,7 +37,10 @@ import io.lettuce.core.dynamic.annotation.Value;
 import io.lettuce.core.dynamic.support.ReflectionUtils;
 
 /**
+ * Unit tests for {@link AnnotationRedisCodecResolver}.
+ *
  * @author Mark Paluch
+ * @author Manyanda Chitimbo
  */
 class AnnotationRedisCodecResolverUnitTests {
 
@@ -89,10 +92,16 @@ class AnnotationRedisCodecResolverUnitTests {
     }
 
     @Test
-    void resolutionShouldFail() {
-
+    void resolutionOfMethodWithMixedTypesShouldFail() {
         Method method = ReflectionUtils.findMethod(CommandMethods.class, "mixedTypes", String.class, byte[].class);
-        assertThatThrownBy(() -> resolve(method)).isInstanceOf(IllegalStateException. class);
+        assertThatThrownBy(() -> resolve(method)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void resolutionOfMethodWithMixedCodecsShouldFail() {
+        Method method = ReflectionUtils.findMethod(CommandMethods.class, "mixedCodecs", String.class, byte[].class,
+                String.class);
+        assertThatThrownBy(() -> resolve(method)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -128,6 +137,8 @@ class AnnotationRedisCodecResolverUnitTests {
         String nothingAnnotated(String key, String value);
 
         String mixedTypes(@Key String key, @Value byte[] value);
+
+        String mixedCodecs(@Key String key1, @Key byte[] key2, @Value String value);
 
         String withWrappers(@Value Range<String> range, @Value io.lettuce.core.Value<Number> value);
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,11 +26,11 @@ import io.lettuce.core.models.role.RedisNodeDescription;
 
 /**
  * Representation of a Redis Cluster node. A {@link RedisClusterNode} is identified by its {@code nodeId}.
- * <p/>
+ * <p>
  * A {@link RedisClusterNode} can be a {@link #getRole() responsible master} or replica. Masters can be responsible for zero to
  * {@link io.lettuce.core.cluster.SlotHash#SLOT_COUNT 16384} slots. Each replica refers to exactly one {@link #getSlaveOf()
  * master}. Nodes can have different {@link io.lettuce.core.cluster.models.partitions.RedisClusterNode.NodeFlag flags} assigned.
- * <p/>
+ * <p>
  * This class is mutable and not thread-safe if mutated by multiple threads concurrently.
  *
  * @author Mark Paluch
@@ -125,6 +125,11 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
         return redisClusterNode;
     }
 
+    /**
+     * Clone {@code this} {@link RedisClusterNode}.
+     *
+     * @return a copy of {@code this} {@link RedisClusterNode}.
+     */
     @Override
     public RedisClusterNode clone() {
         return new RedisClusterNode(this);
@@ -225,6 +230,11 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
         this.configEpoch = configEpoch;
     }
 
+    /**
+     * Return the slots as {@link List}. Note that this method creates a new {@link List} for each time it gets called.
+     *
+     * @return the slots as {@link List}.
+     */
     public List<Integer> getSlots() {
 
         if (slots == null || slots.isEmpty()) {
@@ -296,7 +306,17 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
         }
     }
 
+    /**
+     * Return {@literal true} if {@link RedisClusterNode the other node} contains the same slots as {@code this node}.
+     *
+     * @param other the node to compare with.
+     * @return {@literal true} if {@link RedisClusterNode the other node} contains the same slots as {@code this node}.
+     */
     public boolean hasSameSlotsAs(RedisClusterNode other) {
+
+        if (this.slots == null && other.slots == null) {
+            return true;
+        }
 
         if (this.slots == null || other.slots == null) {
             return false;
@@ -305,6 +325,11 @@ public class RedisClusterNode implements Serializable, RedisNodeDescription {
         return this.slots.equals(other.slots);
     }
 
+    /**
+     * Return the {@link NodeFlag NodeFlags}.
+     *
+     * @return the {@link NodeFlag NodeFlags}.
+     */
     public Set<NodeFlag> getFlags() {
         return flags;
     }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,7 @@
 package io.lettuce.core.output;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 
 import io.lettuce.core.codec.RedisCodec;
 
@@ -43,6 +40,10 @@ public class ArrayOutput<K, V> extends CommandOutput<K, V, List<Object>> {
 
     @Override
     public void set(ByteBuffer bytes) {
+        if (!initialized) {
+            stack.push(new ArrayList<>());
+            initialized = true;
+        }
         if (bytes != null) {
             V value = codec.decodeValue(bytes);
             stack.peek().add(value);
@@ -51,6 +52,10 @@ public class ArrayOutput<K, V> extends CommandOutput<K, V, List<Object>> {
 
     @Override
     public void set(long integer) {
+        if (!initialized) {
+            stack.push(new ArrayList<>());
+            initialized = true;
+        }
         stack.peek().add(integer);
     }
 

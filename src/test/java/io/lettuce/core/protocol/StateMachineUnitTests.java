@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@ import static io.lettuce.core.protocol.RedisStateMachine.State;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
@@ -28,16 +28,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import io.lettuce.core.RedisException;
 import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.output.*;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 
 /**
@@ -45,8 +43,7 @@ import io.netty.buffer.Unpooled;
  * @author Mark Paluch
  */
 class StateMachineUnitTests {
-    private RedisCodec<String, String> codec = new Utf8StringCodec();
-    private Charset charset = Charset.forName("UTF-8");
+    private RedisCodec<String, String> codec = StringCodec.UTF8;
     private CommandOutput<String, String, String> output;
     private RedisStateMachine rsm;
 
@@ -70,7 +67,27 @@ class StateMachineUnitTests {
     @BeforeEach
     final void createStateMachine() {
         output = new StatusOutput<>(codec);
-        rsm = new RedisStateMachine();
+        rsm = new RedisStateMachine(ByteBufAllocator.DEFAULT);
+    }
+
+    @AfterEach
+    void tearDown() {
+        rsm.close();
+    }
+
+    @Test
+    void errorShouldSwitchToResp2Protocol() {
+        assertThat(rsm.decode(buffer("-ERR\r\n"), output)).isTrue();
+        assertThat(output.getError()).isEqualTo("ERR");
+        assertThat(rsm.isDiscoverProtocol()).isFalse();
+        assertThat(rsm.getProtocolVersion()).isEqualTo(ProtocolVersion.RESP2);
+    }
+
+    @Test
+    void helloShouldSwitchToResp3() {
+        assertThat(rsm.decode(buffer("@0\r\n"), output)).isTrue();
+        assertThat(rsm.isDiscoverProtocol()).isFalse();
+        assertThat(rsm.getProtocolVersion()).isEqualTo(ProtocolVersion.RESP3);
     }
 
     @Test
@@ -157,7 +174,7 @@ class StateMachineUnitTests {
 
     @Test
     void invalidReplyType() {
-        assertThatThrownBy(() -> rsm.decode(buffer("="), output)).isInstanceOf(RedisException.class);
+        assertThatThrownBy(() -> rsm.decode(buffer("?"), output)).isInstanceOf(RedisException.class);
     }
 
     @Test
@@ -166,6 +183,6 @@ class StateMachineUnitTests {
     }
 
     ByteBuf buffer(String content) {
-        return Unpooled.copiedBuffer(content, charset);
+        return Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,14 +24,14 @@ import org.junit.jupiter.api.Test;
 import io.lettuce.core.GeoCoordinates;
 import io.lettuce.core.GeoWithin;
 import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 
 /**
  * @author Mark Paluch
  */
 class GeoWithinListOutputUnitTests {
 
-    private GeoWithinListOutput<String, String> sut = new GeoWithinListOutput<>(new Utf8StringCodec(), false, false, false);
+    private GeoWithinListOutput<String, String> sut = new GeoWithinListOutput<>(StringCodec.UTF8, false, false, false);
 
     @Test
     void defaultSubscriberIsSet() {
@@ -54,7 +54,7 @@ class GeoWithinListOutputUnitTests {
     @Test
     void commandOutputKeyAndDistanceDecoded() {
 
-        sut = new GeoWithinListOutput<>(new Utf8StringCodec(), true, false, false);
+        sut = new GeoWithinListOutput<>(StringCodec.UTF8, true, false, false);
 
         sut.multi(1);
         sut.set(ByteBuffer.wrap("key".getBytes()));
@@ -67,7 +67,7 @@ class GeoWithinListOutputUnitTests {
     @Test
     void commandOutputKeyAndHashDecoded() {
 
-        sut = new GeoWithinListOutput<>(new Utf8StringCodec(), false, true, false);
+        sut = new GeoWithinListOutput<>(StringCodec.UTF8, false, true, false);
 
         sut.multi(1);
         sut.set(ByteBuffer.wrap("key".getBytes()));
@@ -80,7 +80,7 @@ class GeoWithinListOutputUnitTests {
     @Test
     void commandOutputLongKeyAndHashDecoded() {
 
-        GeoWithinListOutput<Long, Long> sut = new GeoWithinListOutput<>((RedisCodec) new Utf8StringCodec(), false, true, false);
+        GeoWithinListOutput<Long, Long> sut = new GeoWithinListOutput<>((RedisCodec) StringCodec.UTF8, false, true, false);
 
         sut.multi(1);
         sut.set(1234);
@@ -93,7 +93,7 @@ class GeoWithinListOutputUnitTests {
     @Test
     void commandOutputKeyAndCoordinatesDecoded() {
 
-        sut = new GeoWithinListOutput<>(new Utf8StringCodec(), false, false, true);
+        sut = new GeoWithinListOutput<>(StringCodec.UTF8, false, false, true);
 
         sut.multi(1);
         sut.set(ByteBuffer.wrap("key".getBytes()));

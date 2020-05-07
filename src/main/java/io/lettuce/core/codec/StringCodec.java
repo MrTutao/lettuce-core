@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,13 +17,9 @@ package io.lettuce.core.codec;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CoderResult;
+import java.nio.charset.*;
 
 import io.lettuce.core.internal.LettuceAssert;
-import io.lettuce.core.protocol.LettuceCharsets;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -38,8 +34,8 @@ import io.netty.util.CharsetUtil;
  */
 public class StringCodec implements RedisCodec<String, String>, ToByteBufEncoder<String, String> {
 
-    public static final StringCodec UTF8 = new StringCodec(LettuceCharsets.UTF8);
-    public static final StringCodec ASCII = new StringCodec(LettuceCharsets.ASCII);
+    public static final StringCodec UTF8 = new StringCodec(StandardCharsets.UTF_8);
+    public static final StringCodec ASCII = new StringCodec(StandardCharsets.US_ASCII);
 
     private static final byte[] EMPTY = new byte[0];
 

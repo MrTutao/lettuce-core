@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,10 @@
  */
 package io.lettuce.core.dynamic;
 
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import io.lettuce.core.AbstractRedisReactiveCommands;
@@ -38,8 +41,8 @@ import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.internal.LettuceLists;
 import io.lettuce.core.models.command.CommandDetail;
 import io.lettuce.core.models.command.CommandDetailParser;
-import io.lettuce.core.protocol.LettuceCharsets;
 import io.lettuce.core.protocol.RedisCommand;
+import io.lettuce.core.support.ConnectionWrapping;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -105,7 +108,7 @@ public class RedisCommandFactory {
      * @param connection must not be {@literal null}.
      */
     public RedisCommandFactory(StatefulConnection<?, ?> connection) {
-        this(connection, LettuceLists.newList(new ByteArrayCodec(), new StringCodec(LettuceCharsets.UTF8)));
+        this(connection, LettuceLists.newList(new ByteArrayCodec(), new StringCodec(StandardCharsets.UTF_8)));
     }
 
     /**
@@ -245,14 +248,7 @@ public class RedisCommandFactory {
 
             CommandMethodVerifier verifier = verifyCommandMethods ? commandMethodVerifier : CommandMethodVerifier.NONE;
 
-            AbstractRedisReactiveCommands reactive = null;
-            if (connection instanceof StatefulRedisConnection) {
-                reactive = (AbstractRedisReactiveCommands) ((StatefulRedisConnection) connection).reactive();
-            }
-
-            if (connection instanceof StatefulRedisClusterConnection) {
-                reactive = (AbstractRedisReactiveCommands) ((StatefulRedisClusterConnection) connection).reactive();
-            }
+            AbstractRedisReactiveCommands reactive = getReactiveCommands();
 
             LettuceAssert.isTrue(reactive != null, "Reactive commands is null");
 
@@ -261,6 +257,27 @@ public class RedisCommandFactory {
 
             this.reactive = new ReactiveExecutableCommandLookupStrategy(redisCodecs, commandOutputFactoryResolver, verifier,
                     reactive);
+        }
+
+        private AbstractRedisReactiveCommands getReactiveCommands() {
+
+            Object reactive = null;
+
+            if (connection instanceof StatefulRedisConnection) {
+                reactive = ((StatefulRedisConnection) connection).reactive();
+            }
+
+            if (connection instanceof StatefulRedisClusterConnection) {
+                reactive = ((StatefulRedisClusterConnection) connection).reactive();
+            }
+
+            if (reactive != null && Proxy.isProxyClass(reactive.getClass())) {
+
+                InvocationHandler invocationHandler = Proxy.getInvocationHandler(reactive);
+                reactive = ConnectionWrapping.unwrap(invocationHandler);
+            }
+
+            return (AbstractRedisReactiveCommands) reactive;
         }
 
         @Override
@@ -285,7 +302,8 @@ public class RedisCommandFactory {
         private Batcher batcher = Batcher.NONE;
         private BatchExecutableCommandLookupStrategy batchingStrategy;
 
-        public BatchAwareCommandLookupStrategy(ExecutableCommandLookupStrategy fallbackStrategy, RedisCommandsMetadata metadata) {
+        public BatchAwareCommandLookupStrategy(ExecutableCommandLookupStrategy fallbackStrategy,
+                RedisCommandsMetadata metadata) {
 
             this.fallbackStrategy = fallbackStrategy;
             this.verifier = verifyCommandMethods ? commandMethodVerifier : CommandMethodVerifier.NONE;

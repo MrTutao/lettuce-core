@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,14 +33,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisChannelWriter;
 import io.lettuce.core.RedisException;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.AsyncCommand;
 import io.lettuce.core.protocol.Command;
 import io.lettuce.core.protocol.CommandType;
 import io.lettuce.core.protocol.RedisCommand;
 import io.lettuce.core.resource.ClientResources;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 
 /**
  * @author Mark Paluch
@@ -48,8 +48,8 @@ import io.lettuce.test.Futures;
 @ExtendWith(MockitoExtension.class)
 class ClusterNodeEndpointUnitTests {
 
-    private AsyncCommand<String, String, String> command = new AsyncCommand<>(new Command<>(CommandType.APPEND,
-            new StatusOutput<>(new Utf8StringCodec()), null));
+    private AsyncCommand<String, String, String> command = new AsyncCommand<>(
+            new Command<>(CommandType.APPEND, new StatusOutput<>(StringCodec.UTF8), null));
 
     private Queue<RedisCommand<String, String, ?>> disconnectedBuffer;
 
@@ -111,7 +111,7 @@ class ClusterNodeEndpointUnitTests {
 
         assertThat(command.isDone()).isTrue();
 
-        assertThatThrownBy(() -> Futures.await(command)).isInstanceOf(RedisException.class);
+        assertThatThrownBy(() -> TestFutures.awaitOrTimeout(command)).isInstanceOf(RedisException.class);
     }
 
     @Test
@@ -152,7 +152,7 @@ class ClusterNodeEndpointUnitTests {
 
         sut.close();
 
-        assertThatThrownBy(() -> Futures.await(command)).isInstanceOf(RedisException.class);
+        assertThatThrownBy(() -> TestFutures.awaitOrTimeout(command)).isInstanceOf(RedisException.class);
     }
 
     private void prepareNewEndpoint() {

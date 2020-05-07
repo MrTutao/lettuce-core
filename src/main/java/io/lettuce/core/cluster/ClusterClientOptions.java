@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.lettuce.core.cluster;
 
+import java.nio.charset.Charset;
 import java.time.Duration;
 
 import io.lettuce.core.ClientOptions;
@@ -22,6 +23,7 @@ import io.lettuce.core.SocketOptions;
 import io.lettuce.core.SslOptions;
 import io.lettuce.core.TimeoutOptions;
 import io.lettuce.core.internal.LettuceAssert;
+import io.lettuce.core.protocol.ProtocolVersion;
 
 /**
  * Client Options to control the behavior of {@link RedisClusterClient}.
@@ -108,9 +110,9 @@ public class ClusterClientOptions extends ClientOptions {
         Builder builder = new Builder();
         builder.autoReconnect(clientOptions.isAutoReconnect()).bufferUsageRatio(clientOptions.getBufferUsageRatio())
                 .cancelCommandsOnReconnectFailure(clientOptions.isCancelCommandsOnReconnectFailure())
-                .disconnectedBehavior(clientOptions.getDisconnectedBehavior())
+                .disconnectedBehavior(clientOptions.getDisconnectedBehavior()).scriptCharset(clientOptions.getScriptCharset())
                 .publishOnScheduler(clientOptions.isPublishOnScheduler())
-                .pingBeforeActivateConnection(clientOptions.isPingBeforeActivateConnection())
+                .protocolVersion(clientOptions.getConfiguredProtocolVersion())
                 .requestQueueSize(clientOptions.getRequestQueueSize()).socketOptions(clientOptions.getSocketOptions())
                 .sslOptions(clientOptions.getSslOptions())
                 .suspendReconnectOnProtocolFailure(clientOptions.isSuspendReconnectOnProtocolFailure())
@@ -177,9 +179,14 @@ public class ClusterClientOptions extends ClientOptions {
         }
 
         @Override
-        @Deprecated
         public Builder pingBeforeActivateConnection(boolean pingBeforeActivateConnection) {
             super.pingBeforeActivateConnection(pingBeforeActivateConnection);
+            return this;
+        }
+
+        @Override
+        public Builder protocolVersion(ProtocolVersion protocolVersion) {
+            super.protocolVersion(protocolVersion);
             return this;
         }
 
@@ -216,6 +223,12 @@ public class ClusterClientOptions extends ClientOptions {
         @Override
         public Builder disconnectedBehavior(DisconnectedBehavior disconnectedBehavior) {
             super.disconnectedBehavior(disconnectedBehavior);
+            return this;
+        }
+
+        @Override
+        public Builder scriptCharset(Charset scriptCharset) {
+            super.scriptCharset(scriptCharset);
             return this;
         }
 
@@ -268,8 +281,9 @@ public class ClusterClientOptions extends ClientOptions {
 
         builder.autoReconnect(isAutoReconnect()).bufferUsageRatio(getBufferUsageRatio())
                 .cancelCommandsOnReconnectFailure(isCancelCommandsOnReconnectFailure())
-                .disconnectedBehavior(getDisconnectedBehavior()).publishOnScheduler(isPublishOnScheduler())
-                .pingBeforeActivateConnection(isPingBeforeActivateConnection()).requestQueueSize(getRequestQueueSize())
+                .disconnectedBehavior(getDisconnectedBehavior()).scriptCharset(getScriptCharset())
+                .publishOnScheduler(isPublishOnScheduler()).pingBeforeActivateConnection(isPingBeforeActivateConnection())
+                .protocolVersion(getConfiguredProtocolVersion()).requestQueueSize(getRequestQueueSize())
                 .socketOptions(getSocketOptions()).sslOptions(getSslOptions())
                 .suspendReconnectOnProtocolFailure(isSuspendReconnectOnProtocolFailure()).timeoutOptions(getTimeoutOptions())
                 .validateClusterNodeMembership(isValidateClusterNodeMembership()).maxRedirects(getMaxRedirects())

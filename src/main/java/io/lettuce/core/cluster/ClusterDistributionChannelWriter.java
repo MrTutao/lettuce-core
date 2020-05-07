@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,9 +26,11 @@ import io.lettuce.core.*;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.ClusterConnectionProvider.Intent;
 import io.lettuce.core.cluster.models.partitions.Partitions;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.Futures;
 import io.lettuce.core.internal.HostAndPort;
 import io.lettuce.core.internal.LettuceAssert;
+import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.*;
 import io.lettuce.core.resource.ClientResources;
 
@@ -68,7 +70,8 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
         LettuceAssert.notNull(command, "Command must not be null");
 
         if (closed) {
-            throw new RedisException("Connection is closed");
+            command.completeExceptionally(new RedisException("Connection is closed"));
+            return command;
         }
 
         return doWrite(command);
@@ -126,8 +129,8 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
                 if (isSuccessfullyCompleted(connectFuture)) {
                     writeCommand(commandToSend, false, connectFuture.join(), null);
                 } else {
-                    connectFuture.whenComplete((connection, throwable) -> writeCommand(commandToSend, false, connection,
-                            throwable));
+                    connectFuture
+                            .whenComplete((connection, throwable) -> writeCommand(commandToSend, false, connection, throwable));
                 }
 
                 return commandToSend;
@@ -165,7 +168,7 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
         try {
 
             if (asking) { // set asking bit
-                connection.async().asking();
+                writeCommands(Arrays.asList(asking(), command), ((RedisChannelHandler<K, V>) connection).getChannelWriter());
             }
 
             writeCommand(command, ((RedisChannelHandler<K, V>) connection).getChannelWriter());
@@ -174,12 +177,25 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
         }
     }
 
+    private static <V, K> RedisCommand<K, V, ?> asking() {
+        return new Command(CommandType.ASKING, new StatusOutput<>(StringCodec.ASCII), new CommandArgs<>(StringCodec.ASCII));
+    }
+
     private static <K, V> void writeCommand(RedisCommand<K, V, ?> command, RedisChannelWriter writer) {
 
         try {
             getWriterToUse(writer).write(command);
         } catch (Exception e) {
             command.completeExceptionally(e);
+        }
+    }
+
+    private static <K, V> void writeCommands(Collection<RedisCommand<K, V, ?>> commands, RedisChannelWriter writer) {
+
+        try {
+            getWriterToUse(writer).write(commands);
+        } catch (Exception e) {
+            commands.forEach(command -> command.completeExceptionally(e));
         }
     }
 
@@ -200,7 +216,9 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
         LettuceAssert.notNull(commands, "Commands must not be null");
 
         if (closed) {
-            throw new RedisException("Connection is closed");
+
+            commands.forEach(it -> it.completeExceptionally(new RedisException("Connection is closed")));
+            return (Collection<RedisCommand<K, V, ?>>) commands;
         }
 
         List<ClusterCommand<K, V, ?>> clusterCommands = new ArrayList<>(commands.size());
@@ -237,8 +255,8 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
         for (Map.Entry<SlotIntent, List<ClusterCommand<K, V, ?>>> entry : partitions.entrySet()) {
 
             SlotIntent slotIntent = entry.getKey();
-            RedisChannelHandler<K, V> connection = (RedisChannelHandler<K, V>) clusterConnectionProvider.getConnection(
-                    slotIntent.intent, slotIntent.slotHash);
+            RedisChannelHandler<K, V> connection = (RedisChannelHandler<K, V>) clusterConnectionProvider
+                    .getConnection(slotIntent.intent, slotIntent.slotHash);
 
             RedisChannelWriter channelWriter = connection.getChannelWriter();
             if (channelWriter instanceof ClusterDistributionChannelWriter) {
@@ -302,8 +320,8 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
     static HostAndPort getMoveTarget(String errorMessage) {
 
         LettuceAssert.notEmpty(errorMessage, "ErrorMessage must not be empty");
-        LettuceAssert.isTrue(errorMessage.startsWith(CommandKeyword.MOVED.name()), "ErrorMessage must start with "
-                + CommandKeyword.MOVED);
+        LettuceAssert.isTrue(errorMessage.startsWith(CommandKeyword.MOVED.name()),
+                "ErrorMessage must start with " + CommandKeyword.MOVED);
 
         String[] movedMessageParts = errorMessage.split(" ");
         LettuceAssert.isTrue(movedMessageParts.length >= 3, "ErrorMessage must consist of 3 tokens (" + errorMessage + ")");
@@ -314,8 +332,8 @@ class ClusterDistributionChannelWriter implements RedisChannelWriter {
     static HostAndPort getAskTarget(String errorMessage) {
 
         LettuceAssert.notEmpty(errorMessage, "ErrorMessage must not be empty");
-        LettuceAssert.isTrue(errorMessage.startsWith(CommandKeyword.ASK.name()), "ErrorMessage must start with "
-                + CommandKeyword.ASK);
+        LettuceAssert.isTrue(errorMessage.startsWith(CommandKeyword.ASK.name()),
+                "ErrorMessage must start with " + CommandKeyword.ASK);
 
         String[] movedMessageParts = errorMessage.split(" ");
         LettuceAssert.isTrue(movedMessageParts.length >= 3, "ErrorMessage must consist of 3 tokens (" + errorMessage + ")");

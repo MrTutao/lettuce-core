@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,7 +43,7 @@ import io.lettuce.core.cluster.models.partitions.ClusterPartitionParser;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.test.ConnectionTestUtil;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.Wait;
 import io.lettuce.test.resource.DefaultRedisClient;
 import io.lettuce.test.resource.FastShutdown;
@@ -292,7 +292,7 @@ public class RedisClusterSetupTest extends TestSupport {
 
         set.await(5, TimeUnit.SECONDS);
 
-        assertThatThrownBy(() -> Futures.await(set)).hasRootCauseInstanceOf(RedisException.class);
+        assertThatThrownBy(() -> TestFutures.awaitOrTimeout(set)).hasRootCauseInstanceOf(RedisException.class);
             clusterConnection.getStatefulConnection().close();
     }
 
@@ -338,7 +338,7 @@ public class RedisClusterSetupTest extends TestSupport {
         partitions.updateCache();
         clusterClient.updatePartitionsInConnections();
 
-        Wait.untilTrue(() -> Futures.areAllCompleted(futures)).waitOrTimeout();
+        Wait.untilTrue(() -> TestFutures.areAllDone(futures)).waitOrTimeout();
 
         assertRoutedExecution(clusterConnection);
 
@@ -478,7 +478,7 @@ public class RedisClusterSetupTest extends TestSupport {
         RedisAdvancedClusterAsyncCommands<String, String> clusterConnection = clusterClient.connect().async();
         clusterConnection.getStatefulConnection().setReadFrom(ReadFrom.REPLICA);
 
-        Futures.await(clusterConnection.set(key, value));
+        TestFutures.awaitOrTimeout(clusterConnection.set(key, value));
 
         try {
             clusterConnection.get(key);
@@ -517,9 +517,9 @@ public class RedisClusterSetupTest extends TestSupport {
     }
 
     private void assertExecuted(RedisFuture<String> set) {
-        Futures.await(set);
+        TestFutures.awaitOrTimeout(set);
         assertThat(set.getError()).isNull();
-        assertThat(Futures.get(set)).isEqualTo("OK");
+        assertThat(TestFutures.getOrTimeout(set)).isEqualTo("OK");
     }
 
     private void suspendConnection(RedisClusterAsyncCommands<String, String> asyncCommands) {

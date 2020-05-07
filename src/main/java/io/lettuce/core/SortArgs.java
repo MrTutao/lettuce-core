@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,7 @@ import io.lettuce.core.protocol.CommandKeyword;
 /**
  * Argument list builder for the Redis <a href="http://redis.io/commands/sort">SORT</a> command. Static import the methods from
  * {@link Builder} and chain the method calls: {@code by("weight_*").desc().limit(0, 2)}.
- * <p/>
+ * <p>
  * {@link ScanArgs} is a mutable object and instances should be used only once to avoid shared mutable state.
  *
  * @author Will Glozer

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.lettuce.core;
 
 import static io.lettuce.core.protocol.CommandType.*;
 
+import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.Date;
 import java.util.List;
@@ -40,6 +41,7 @@ import io.lettuce.core.protocol.*;
  * @param <V> Value type.
  * @author Will Glozer
  * @author Mark Paluch
+ * @author Tugdual Grall
  */
 @SuppressWarnings("unchecked")
 public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsyncCommands<K, V>, RedisKeyAsyncCommands<K, V>,
@@ -49,7 +51,6 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
         RedisGeoAsyncCommands<K, V>, RedisClusterAsyncCommands<K, V> {
 
     private final StatefulConnection<K, V> connection;
-    private final RedisCodec<K, V> codec;
     private final RedisCommandBuilder<K, V> commandBuilder;
 
     /**
@@ -60,7 +61,6 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
      */
     public AbstractRedisAsyncCommands(StatefulConnection<K, V> connection, RedisCodec<K, V> codec) {
         this.connection = connection;
-        this.codec = codec;
         this.commandBuilder = new RedisCommandBuilder<>(codec);
     }
 
@@ -75,15 +75,29 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public String auth(String password) {
+    public RedisFuture<String> auth(CharSequence password) {
 
         LettuceAssert.notNull(password, "Password must not be null");
-        AsyncCommand<K, V, String> cmd = authAsync(password.toCharArray());
-        return LettuceFutures.awaitOrCancel(cmd, connection.getTimeout().toNanos(), TimeUnit.NANOSECONDS);
+        return dispatch(commandBuilder.auth(password));
     }
 
-    public AsyncCommand<K, V, String> authAsync(char[] password) {
+    public RedisFuture<String> auth(char[] password) {
+
+        LettuceAssert.notNull(password, "Password must not be null");
         return dispatch(commandBuilder.auth(password));
+    }
+
+    @Override
+    public RedisFuture<String> auth(String username, CharSequence password) {
+        LettuceAssert.notNull(username, "Username must not be null");
+        LettuceAssert.notNull(password, "Password must not be null");
+        return dispatch(commandBuilder.auth(username, password));
+    }
+
+    public RedisFuture<String> auth(String username, char[] password) {
+        LettuceAssert.notNull(username, "Username must not be null");
+        LettuceAssert.notNull(password, "Password must not be null");
+        return dispatch(commandBuilder.auth(username, password));
     }
 
     @Override
@@ -179,6 +193,11 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     @Override
     public RedisFuture<String> clientList() {
         return dispatch(commandBuilder.clientList());
+    }
+
+    @Override
+    public RedisFuture<Long> clientId() {
+        return dispatch(commandBuilder.clientId());
     }
 
     @Override
@@ -426,8 +445,13 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public String digest(V script) {
-        return LettuceStrings.digest(codec.encodeValue(script));
+    public String digest(String script) {
+        return digest(encodeScript(script));
+    }
+
+    @Override
+    public String digest(byte[] script) {
+        return LettuceStrings.digest(script);
     }
 
     @Override
@@ -484,12 +508,22 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     @Override
     @SuppressWarnings("unchecked")
     public <T> RedisFuture<T> eval(String script, ScriptOutputType type, K... keys) {
+        return eval(encodeScript(script), type, keys);
+    }
+
+    @Override
+    public <T> RedisFuture<T> eval(byte[] script, ScriptOutputType type, K... keys) {
         return (RedisFuture<T>) dispatch(commandBuilder.eval(script, type, keys));
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> RedisFuture<T> eval(String script, ScriptOutputType type, K[] keys, V... values) {
+        return eval(encodeScript(script), type, keys, values);
+    }
+
+    @Override
+    public <T> RedisFuture<T> eval(byte[] script, ScriptOutputType type, K[] keys, V... values) {
         return (RedisFuture<T>) dispatch(commandBuilder.eval(script, type, keys, values));
     }
 
@@ -772,6 +806,11 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
+    public RedisFuture<Long> hset(K key, Map<K, V> map) {
+        return dispatch(commandBuilder.hset(key, map));
+    }
+
+    @Override
     public RedisFuture<Boolean> hsetnx(K key, K field, V value) {
         return dispatch(commandBuilder.hsetnx(key, field, value));
     }
@@ -1040,7 +1079,7 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public RedisFuture<V> randomkey() {
+    public RedisFuture<K> randomkey() {
         return dispatch(commandBuilder.randomkey());
     }
 
@@ -1175,7 +1214,12 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public RedisFuture<String> scriptLoad(V script) {
+    public RedisFuture<String> scriptLoad(String script) {
+        return scriptLoad(encodeScript(script));
+    }
+
+    @Override
+    public RedisFuture<String> scriptLoad(byte[] script) {
         return dispatch(commandBuilder.scriptLoad(script));
     }
 
@@ -1194,12 +1238,7 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
         return dispatch(commandBuilder.sdiffstore(destination, keys));
     }
 
-    public String select(int db) {
-        AsyncCommand<K, V, String> cmd = selectAsync(db);
-        return LettuceFutures.awaitOrCancel(cmd, connection.getTimeout().toNanos(), TimeUnit.NANOSECONDS);
-    }
-
-    protected AsyncCommand<K, V, String> selectAsync(int db) {
+    public RedisFuture<String> select(int db) {
         return dispatch(commandBuilder.select(db));
     }
 
@@ -1220,11 +1259,6 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
 
     public void setTimeout(Duration timeout) {
         connection.setTimeout(timeout);
-    }
-
-    @Deprecated
-    public void setTimeout(long timeout, TimeUnit unit) {
-        connection.setTimeout(timeout, unit);
     }
 
     @Override
@@ -1403,7 +1437,8 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public RedisFuture<StreamScanCursor> sscan(ValueStreamingChannel<V> channel, K key, ScanCursor scanCursor, ScanArgs scanArgs) {
+    public RedisFuture<StreamScanCursor> sscan(ValueStreamingChannel<V> channel, K key, ScanCursor scanCursor,
+            ScanArgs scanArgs) {
         return dispatch(commandBuilder.sscanStreaming(channel, key, scanCursor, scanArgs));
     }
 
@@ -1848,7 +1883,8 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public RedisFuture<Long> zrangebyscore(ValueStreamingChannel<V> channel, K key, Range<? extends Number> range, Limit limit) {
+    public RedisFuture<Long> zrangebyscore(ValueStreamingChannel<V> channel, K key, Range<? extends Number> range,
+            Limit limit) {
         return dispatch(commandBuilder.zrangebyscore(channel, key, range, limit));
     }
 
@@ -2065,12 +2101,14 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     }
 
     @Override
-    public RedisFuture<List<ScoredValue<V>>> zrevrangebyscoreWithScores(K key, double max, double min, long offset, long count) {
+    public RedisFuture<List<ScoredValue<V>>> zrevrangebyscoreWithScores(K key, double max, double min, long offset,
+            long count) {
         return dispatch(commandBuilder.zrevrangebyscoreWithScores(key, max, min, offset, count));
     }
 
     @Override
-    public RedisFuture<List<ScoredValue<V>>> zrevrangebyscoreWithScores(K key, String max, String min, long offset, long count) {
+    public RedisFuture<List<ScoredValue<V>>> zrevrangebyscoreWithScores(K key, String max, String min, long offset,
+            long count) {
         return dispatch(commandBuilder.zrevrangebyscoreWithScores(key, max, min, offset, count));
     }
 
@@ -2172,5 +2210,11 @@ public abstract class AbstractRedisAsyncCommands<K, V> implements RedisHashAsync
     @Override
     public RedisFuture<Long> zunionstore(K destination, ZStoreArgs storeArgs, K... keys) {
         return dispatch(commandBuilder.zunionstore(destination, storeArgs, keys));
+    }
+
+    private byte[] encodeScript(String script) {
+        LettuceAssert.notNull(script, "Lua script must not be null");
+        LettuceAssert.notEmpty(script, "Lua script must not be empty");
+        return script.getBytes(getConnection().getOptions().getScriptCharset());
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,14 +29,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import io.lettuce.RedisBug;
 import io.lettuce.core.*;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.sentinel.api.StatefulRedisSentinelConnection;
 import io.lettuce.core.sentinel.api.async.RedisSentinelAsyncCommands;
 import io.lettuce.core.sentinel.api.sync.RedisSentinelCommands;
-import io.lettuce.test.Futures;
 import io.lettuce.test.LettuceExtension;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.Wait;
 import io.lettuce.test.settings.TestSettings;
 
@@ -78,7 +79,7 @@ public class SentinelConnectionIntegrationTests extends TestSupport {
 
         RedisFuture<List<Map<String, String>>> future = sentinelAsync.masters();
 
-        assertThat(Futures.get(future)).isNotNull();
+        assertThat(TestFutures.getOrTimeout(future)).isNotNull();
         assertThat(future.isDone()).isTrue();
         assertThat(future.isCancelled()).isFalse();
     }
@@ -162,12 +163,12 @@ public class SentinelConnectionIntegrationTests extends TestSupport {
     }
 
     @Test
-    void sentinelConnectionPingBeforeConnectShouldDiscardPassword() {
+    void sentinelConnectionShouldDiscardPassword() {
 
         RedisURI redisURI = RedisURI.Builder.sentinel(TestSettings.host(), SentinelTestSettings.MASTER_ID)
                 .withPassword("hello-world").build();
 
-        redisClient.setOptions(ClientOptions.builder().pingBeforeActivateConnection(true).build());
+        redisClient.setOptions(ClientOptions.builder().build());
         StatefulRedisSentinelConnection<String, String> connection = redisClient.connectSentinel(redisURI);
 
         assertThat(connection.sync().ping()).isEqualTo("PONG");

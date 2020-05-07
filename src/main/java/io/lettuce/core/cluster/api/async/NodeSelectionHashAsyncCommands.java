@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -248,6 +248,16 @@ public interface NodeSelectionHashAsyncCommands<K, V> {
      *         {@code field} already exists in the hash and the value was updated.
      */
     AsyncExecutions<Boolean> hset(K key, K field, V value);
+
+    /**
+     * Set multiple hash fields to multiple values.
+     *
+     * @param key the key of the hash
+     * @param map the field/value pairs to update
+     * @return Long integer-reply: the number of fields that were added.
+     * @since 5.3
+     */
+    AsyncExecutions<Long> hset(K key, Map<K, V> map);
 
     /**
      * Set the value of a hash field, only if the field does not exist.

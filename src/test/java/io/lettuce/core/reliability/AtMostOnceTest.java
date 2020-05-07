@@ -1,11 +1,11 @@
 /*
- * Copyright 2011-2019 the original author or authors.
+ * Copyright 2011-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ import io.lettuce.core.*;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.codec.Utf8StringCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.output.IntegerOutput;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.AsyncCommand;
@@ -41,7 +41,7 @@ import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.core.protocol.CommandType;
 import io.lettuce.test.ConnectionTestUtil;
 import io.lettuce.test.Delay;
-import io.lettuce.test.Futures;
+import io.lettuce.test.TestFutures;
 import io.lettuce.test.Wait;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -54,7 +54,6 @@ import io.netty.util.Version;
 @SuppressWarnings("rawtypes")
 class AtMostOnceTest extends AbstractRedisClientTest {
 
-    private final Utf8StringCodec CODEC = new Utf8StringCodec();
     private String key = "key";
 
     @BeforeEach
@@ -143,14 +142,14 @@ class AtMostOnceTest extends AbstractRedisClientTest {
 
         sync.set(key, "1");
         AsyncCommand<String, String, String> working = new AsyncCommand<>(new Command<String, String, String>(CommandType.INCR,
-                new IntegerOutput(CODEC), new CommandArgs<>(CODEC).addKey(key)));
+                new IntegerOutput(StringCodec.UTF8), new CommandArgs<>(StringCodec.UTF8).addKey(key)));
         channelWriter.write(working);
         assertThat(working.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(sync.get(key)).isEqualTo("2");
 
         AsyncCommand<String, String, Object> command = new AsyncCommand<String, String, Object>(
-                new Command<String, String, Object>(CommandType.INCR, new IntegerOutput(CODEC),
-                        new CommandArgs<>(CODEC).addKey(key))) {
+                new Command<String, String, Object>(CommandType.INCR, new IntegerOutput(StringCodec.UTF8),
+                        new CommandArgs<>(StringCodec.UTF8).addKey(key))) {
 
             @Override
             public void encode(ByteBuf buf) {
@@ -193,7 +192,7 @@ class AtMostOnceTest extends AbstractRedisClientTest {
         final CountDownLatch block = new CountDownLatch(1);
 
         AsyncCommand<String, String, Object> command = new AsyncCommand<String, String, Object>(new Command<>(CommandType.INCR,
-                new IntegerOutput(CODEC), new CommandArgs<>(CODEC).addKey(key))) {
+                new IntegerOutput(StringCodec.UTF8), new CommandArgs<>(StringCodec.UTF8).addKey(key))) {
 
             @Override
             public void encode(ByteBuf buf) {
@@ -236,8 +235,8 @@ class AtMostOnceTest extends AbstractRedisClientTest {
 
         sync.set(key, "1");
 
-        AsyncCommand<String, String, String> command = new AsyncCommand<>(new Command<>(CommandType.INCR, new StatusOutput<>(
-                CODEC), new CommandArgs<>(CODEC).addKey(key)));
+        AsyncCommand<String, String, String> command = new AsyncCommand<>(new Command<>(CommandType.INCR,
+                new StatusOutput<>(StringCodec.UTF8), new CommandArgs<>(StringCodec.UTF8).addKey(key)));
 
         channelWriter.write(command);
 
@@ -298,7 +297,7 @@ class AtMostOnceTest extends AbstractRedisClientTest {
 
             connection.flushCommands();
 
-            Futures.await(incr);
+            TestFutures.awaitOrTimeout(incr);
 
         } catch (Exception e) {
             assertThat(e).hasRootCauseInstanceOf(RedisException.class).hasMessageContaining("Connection disconnected");
