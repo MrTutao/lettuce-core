@@ -48,16 +48,19 @@ class SentinelTopologyProvider implements TopologyProvider {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(SentinelTopologyProvider.class);
 
     private final String masterId;
+
     private final RedisClient redisClient;
+
     private final RedisURI sentinelUri;
+
     private final Duration timeout;
 
     /**
      * Creates a new {@link SentinelTopologyProvider}.
      *
      * @param masterId must not be empty
-     * @param redisClient must not be {@literal null}.
-     * @param sentinelUri must not be {@literal null}.
+     * @param redisClient must not be {@code null}.
+     * @param sentinelUri must not be {@code null}.
      */
     public SentinelTopologyProvider(String masterId, RedisClient redisClient, RedisURI sentinelUri) {
 
@@ -107,9 +110,9 @@ class SentinelTopologyProvider implements TopologyProvider {
 
             List<RedisNodeDescription> result = new ArrayList<>();
 
-            result.add(toNode(tuple.getT1(), RedisInstance.Role.MASTER));
+            result.add(toNode(tuple.getT1(), RedisInstance.Role.UPSTREAM));
             result.addAll(tuple.getT2().stream().filter(SentinelTopologyProvider::isAvailable)
-                    .map(map -> toNode(map, RedisInstance.Role.SLAVE)).collect(Collectors.toList()));
+                    .map(map -> toNode(map, RedisInstance.Role.REPLICA)).collect(Collectors.toList()));
 
             return result;
         });
@@ -130,7 +133,7 @@ class SentinelTopologyProvider implements TopologyProvider {
 
         String ip = map.get("ip");
         String port = map.get("port");
-        return new RedisMasterReplicaNode(ip, Integer.parseInt(port), sentinelUri, role);
+        return new RedisUpstreamReplicaNode(ip, Integer.parseInt(port), sentinelUri, role);
     }
 
 }

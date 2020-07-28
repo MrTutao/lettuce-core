@@ -40,7 +40,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.test.util.ReflectionTestUtils;
+import io.lettuce.test.ReflectionTestUtils;
 
 import edu.umd.cs.mtc.MultithreadedTestCase;
 import edu.umd.cs.mtc.TestFramework;
@@ -468,8 +468,8 @@ class DefaultEndpointUnitTests {
         /**
          * Create a new {@link DefaultEndpoint}.
          *
-         * @param clientOptions client options for this connection, must not be {@literal null}.
-         * @param clientResources client resources for this connection, must not be {@literal null}.
+         * @param clientOptions client options for this connection, must not be {@code null}.
+         * @param clientResources client resources for this connection, must not be {@code null}.
          */
         TestableEndpoint(ClientOptions clientOptions, ClientResources clientResources) {
             super(clientOptions, clientResources);

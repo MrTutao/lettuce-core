@@ -17,12 +17,15 @@ package io.lettuce.core;
 
 import static io.lettuce.core.protocol.CommandType.*;
 
-import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.Date;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import io.lettuce.core.codec.Base16;
+import io.lettuce.core.internal.LettuceStrings;
+import io.lettuce.core.models.stream.PendingMessage;
+import io.lettuce.core.models.stream.PendingMessages;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import io.lettuce.core.GeoArgs.Unit;
@@ -57,9 +60,13 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
         RedisTransactionalReactiveCommands<K, V>, RedisGeoReactiveCommands<K, V>, RedisClusterReactiveCommands<K, V> {
 
     private final Object mutex = new Object();
+
     private final StatefulConnection<K, V> connection;
+
     private final RedisCommandBuilder<K, V> commandBuilder;
+
     private final ClientResources clientResources;
+
     private final boolean tracingEnabled;
 
     private EventExecutorGroup scheduler;
@@ -191,8 +198,18 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     }
 
     @Override
+    public Mono<String> clientCaching(boolean enabled) {
+        return createMono(() -> commandBuilder.clientCaching(enabled));
+    }
+
+    @Override
     public Mono<K> clientGetname() {
         return createMono(commandBuilder::clientGetname);
+    }
+
+    @Override
+    public Mono<Long> clientGetredir() {
+        return createMono(commandBuilder::clientGetredir);
     }
 
     @Override
@@ -223,6 +240,11 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     @Override
     public Mono<String> clientSetname(K name) {
         return createMono(() -> commandBuilder.clientSetname(name));
+    }
+
+    @Override
+    public Mono<String> clientTracking(TrackingArgs args) {
+        return createMono(() -> commandBuilder.clientTracking(args));
     }
 
     @Override
@@ -517,7 +539,7 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
 
     @Override
     public String digest(byte[] script) {
-        return LettuceStrings.digest(script);
+        return Base16.digest(script);
     }
 
     @Override
@@ -951,6 +973,26 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     @Override
     public Mono<V> lpop(K key) {
         return createMono(() -> commandBuilder.lpop(key));
+    }
+
+    @Override
+    public Mono<Long> lpos(K key, V value) {
+        return lpos(key, value, null);
+    }
+
+    @Override
+    public Mono<Long> lpos(K key, V value, LPosArgs args) {
+        return createMono(() -> commandBuilder.lpos(key, value, args));
+    }
+
+    @Override
+    public Flux<Long> lpos(K key, V value, int count) {
+        return lpos(key, value, count, null);
+    }
+
+    @Override
+    public Flux<Long> lpos(K key, V value, int count, LPosArgs args) {
+        return createDissolvingFlux(() -> commandBuilder.lpos(key, value, count, args));
     }
 
     @Override
@@ -1526,6 +1568,11 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     }
 
     @Override
+    public Mono<StringMatchResult> stralgoLcs(StrAlgoArgs strAlgoArgs) {
+        return createMono(() -> commandBuilder.stralgoLcs(strAlgoArgs));
+    }
+
+    @Override
     public Flux<V> sunion(K... keys) {
         return createDissolvingFlux(() -> commandBuilder.sunion(keys));
     }
@@ -1679,17 +1726,17 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
     }
 
     @Override
-    public Flux<Object> xpending(K key, K group) {
-        return xpending(key, group, Range.unbounded(), Limit.unlimited());
+    public Mono<PendingMessages> xpending(K key, K group) {
+        return createMono(() -> commandBuilder.xpending(key, group));
     }
 
     @Override
-    public Flux<Object> xpending(K key, K group, Range<String> range, Limit limit) {
+    public Flux<PendingMessage> xpending(K key, K group, Range<String> range, Limit limit) {
         return createDissolvingFlux(() -> commandBuilder.xpending(key, group, range, limit));
     }
 
     @Override
-    public Flux<Object> xpending(K key, Consumer<K> consumer, Range<String> range, Limit limit) {
+    public Flux<PendingMessage> xpending(K key, Consumer<K> consumer, Range<String> range, Limit limit) {
         return createDissolvingFlux(() -> commandBuilder.xpending(key, consumer, range, limit));
     }
 
@@ -2281,4 +2328,5 @@ public abstract class AbstractRedisReactiveCommands<K, V> implements RedisHashRe
         LettuceAssert.notEmpty(script, "Lua script must not be empty");
         return script.getBytes(getConnection().getOptions().getScriptCharset());
     }
+
 }

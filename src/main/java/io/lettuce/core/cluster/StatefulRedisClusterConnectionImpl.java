@@ -34,6 +34,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.cluster.api.async.RedisAdvancedClusterAsyncCommands;
 import io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands;
+import io.lettuce.core.cluster.api.push.RedisClusterPushListener;
 import io.lettuce.core.cluster.api.reactive.RedisAdvancedClusterReactiveCommands;
 import io.lettuce.core.cluster.api.sync.NodeSelection;
 import io.lettuce.core.cluster.api.sync.NodeSelectionCommands;
@@ -59,26 +60,35 @@ import io.lettuce.core.protocol.RedisCommand;
 public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandler<K, V>
         implements StatefulRedisClusterConnection<K, V> {
 
+    private final ClusterPushHandler pushHandler;
+
     protected final RedisCodec<K, V> codec;
+
     protected final RedisAdvancedClusterCommands<K, V> sync;
+
     protected final RedisAdvancedClusterAsyncCommandsImpl<K, V> async;
+
     protected final RedisAdvancedClusterReactiveCommandsImpl<K, V> reactive;
 
     private final ClusterConnectionState connectionState = new ClusterConnectionState();
 
     private Partitions partitions;
+
     private volatile CommandSet commandSet;
 
     /**
      * Initialize a new connection.
      *
      * @param writer the channel writer
+     * @param pushHandler the Cluster push handler
      * @param codec Codec used to encode/decode keys and values.
      * @param timeout Maximum time to wait for a response.
      */
-    public StatefulRedisClusterConnectionImpl(RedisChannelWriter writer, RedisCodec<K, V> codec, Duration timeout) {
+    public StatefulRedisClusterConnectionImpl(RedisChannelWriter writer, ClusterPushHandler pushHandler, RedisCodec<K, V> codec,
+            Duration timeout) {
 
         super(writer, timeout);
+        this.pushHandler = pushHandler;
         this.codec = codec;
 
         this.async = new RedisAdvancedClusterAsyncCommandsImpl<>(this, codec);
@@ -105,6 +115,16 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
     @Override
     public RedisAdvancedClusterReactiveCommands<K, V> reactive() {
         return reactive;
+    }
+
+    @Override
+    public void addListener(RedisClusterPushListener listener) {
+        pushHandler.addListener(listener);
+    }
+
+    @Override
+    public void removeListener(RedisClusterPushListener listener) {
+        pushHandler.removeListener(listener);
     }
 
     CommandSet getCommandSet() {
@@ -277,5 +297,7 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         protected void setReadOnly(boolean readOnly) {
             super.setReadOnly(readOnly);
         }
+
     }
+
 }

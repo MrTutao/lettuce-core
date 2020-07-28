@@ -35,6 +35,7 @@ import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.ExceptionFactory;
 import io.lettuce.core.internal.Exceptions;
 import io.lettuce.core.internal.Futures;
+import io.lettuce.core.internal.LettuceStrings;
 import io.lettuce.core.resource.ClientResources;
 import io.netty.util.Timeout;
 import io.netty.util.concurrent.EventExecutorGroup;
@@ -52,6 +53,7 @@ class DefaultClusterTopologyRefresh implements ClusterTopologyRefresh {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultClusterTopologyRefresh.class);
 
     private final NodeConnectionFactory nodeConnectionFactory;
+
     private final ClientResources clientResources;
 
     public DefaultClusterTopologyRefresh(NodeConnectionFactory nodeConnectionFactory, ClientResources clientResources) {
@@ -65,7 +67,7 @@ class DefaultClusterTopologyRefresh implements ClusterTopologyRefresh {
      *
      * @param seed collection of {@link RedisURI}s
      * @param connectTimeout connect timeout
-     * @param discovery {@literal true} to discover additional nodes
+     * @param discovery {@code true} to discover additional nodes
      * @return mapping between {@link RedisURI} and {@link Partitions}
      */
     public CompletionStage<Map<RedisURI, Partitions>> loadViews(Iterable<RedisURI> seed, Duration connectTimeout,
@@ -409,6 +411,7 @@ class DefaultClusterTopologyRefresh implements ClusterTopologyRefresh {
             connections.put(uri, future);
         }
 
+        @SuppressWarnings("rawtypes")
         public CompletableFuture<Void> close() {
 
             CompletableFuture[] futures = connections.values().stream()
@@ -464,8 +467,10 @@ class DefaultClusterTopologyRefresh implements ClusterTopologyRefresh {
             }
             return activeConnections;
         }
+
     }
 
+    @SuppressWarnings("serial")
     static class CannotRetrieveClusterPartitions extends RedisException {
 
         private final Map<RedisURI, String> failure;
@@ -499,5 +504,7 @@ class DefaultClusterTopologyRefresh implements ClusterTopologyRefresh {
         public synchronized Throwable fillInStackTrace() {
             return this;
         }
+
     }
+
 }

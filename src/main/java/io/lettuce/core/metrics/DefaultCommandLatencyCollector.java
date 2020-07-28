@@ -52,10 +52,13 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
             .newUpdater(DefaultCommandLatencyCollector.class, PauseDetectorWrapper.class, "pauseDetectorWrapper");
 
     private static final boolean LATENCY_UTILS_AVAILABLE = isPresent("org.LatencyUtils.PauseDetector");
+
     private static final boolean HDR_UTILS_AVAILABLE = isPresent("org.HdrHistogram.Histogram");
+
     private static final PauseDetectorWrapper GLOBAL_PAUSE_DETECTOR = PauseDetectorWrapper.create();
 
     private static final long MIN_LATENCY = 1000;
+
     private static final long MAX_LATENCY = TimeUnit.MINUTES.toNanos(5);
 
     private final CommandLatencyCollectorOptions options;
@@ -91,20 +94,25 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
             return;
         }
 
-        if (PAUSE_DETECTOR_UPDATER.get(this) == null) {
-            if (PAUSE_DETECTOR_UPDATER.compareAndSet(this, null, GLOBAL_PAUSE_DETECTOR)) {
-                PAUSE_DETECTOR_UPDATER.get(this).retain();
-            }
-        }
-        PauseDetector pauseDetector = ((DefaultPauseDetectorWrapper) PAUSE_DETECTOR_UPDATER.get(this)).getPauseDetector();
+        PauseDetector pauseDetector;
 
+        do {
+            if (PAUSE_DETECTOR_UPDATER.get(this) == null) {
+                if (PAUSE_DETECTOR_UPDATER.compareAndSet(this, null, GLOBAL_PAUSE_DETECTOR)) {
+                    PAUSE_DETECTOR_UPDATER.get(this).retain();
+                }
+            }
+            pauseDetector = ((DefaultPauseDetectorWrapper) PAUSE_DETECTOR_UPDATER.get(this)).getPauseDetector();
+        } while (pauseDetector == null);
+
+        PauseDetector pauseDetectorToUse = pauseDetector;
         Latencies latencies = latencyMetricsRef.get().computeIfAbsent(createId(local, remote, commandType), id -> {
 
             if (options.resetLatenciesAfterEvent()) {
-                return new Latencies(pauseDetector);
+                return new Latencies(pauseDetectorToUse);
             }
 
-            return new CummulativeLatencies(pauseDetector);
+            return new CummulativeLatencies(pauseDetectorToUse);
         });
 
         latencies.firstResponse.recordLatency(rangify(firstResponseLatency));
@@ -207,7 +215,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
     }
 
     /**
-     * Returns {@literal true} if HdrUtils and LatencyUtils are available on the class path.
+     * Returns {@code true} if HdrUtils and LatencyUtils are available on the class path.
      *
      * @return
      */
@@ -227,6 +235,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
     public static CommandLatencyCollector disabled() {
 
         return new CommandLatencyCollector() {
+
             @Override
             public void recordCommandLatency(SocketAddress local, SocketAddress remote, ProtocolKeyword commandType,
                     long firstResponseLatency, long completionLatency) {
@@ -245,12 +254,14 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
             public boolean isEnabled() {
                 return false;
             }
+
         };
     }
 
     private static class Latencies {
 
         private final LatencyStats firstResponse;
+
         private final LatencyStats completion;
 
         Latencies(PauseDetector pauseDetector) {
@@ -270,11 +281,13 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
             firstResponse.stop();
             completion.stop();
         }
+
     }
 
     private static class CummulativeLatencies extends Latencies {
 
         private final Histogram firstResponse;
+
         private final Histogram completion;
 
         CummulativeLatencies(PauseDetector pauseDetector) {
@@ -297,6 +310,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
             completion.add(super.getFirstResponseHistogram());
             return completion;
         }
+
     }
 
     /**
@@ -308,6 +322,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
          * No-operation {@link PauseDetectorWrapper} implementation.
          */
         PauseDetectorWrapper NO_OP = new PauseDetectorWrapper() {
+
             @Override
             public void release() {
             }
@@ -315,6 +330,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
             @Override
             public void retain() {
             }
+
         };
 
         static PauseDetectorWrapper create() {
@@ -335,6 +351,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
          * Release reference to {@link PauseDetectorWrapper} and decrement reference counter.
          */
         void release();
+
     }
 
     /**
@@ -345,25 +362,19 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
         private static final AtomicLong instanceCounter = new AtomicLong();
 
         private final AtomicLong counter = new AtomicLong();
+
         private final Object mutex = new Object();
 
         private volatile PauseDetector pauseDetector;
+
         private volatile Thread shutdownHook;
 
         /**
          * Obtain the current {@link PauseDetector}. Requires a call to {@link #retain()} first.
-         * 
+         *
          * @return
          */
         public PauseDetector getPauseDetector() {
-
-            for (;;) {
-
-                if (pauseDetector != null) {
-                    break;
-                }
-            }
-
             return pauseDetector;
         }
 
@@ -387,10 +398,12 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
                             TimeUnit.MILLISECONDS.toNanos(10), 3);
 
                     shutdownHook = new Thread("ShutdownHook for SimplePauseDetector") {
+
                         @Override
                         public void run() {
                             pauseDetector.shutdown();
                         }
+
                     };
 
                     this.pauseDetector = pauseDetector;
@@ -425,5 +438,7 @@ public class DefaultCommandLatencyCollector implements CommandLatencyCollector {
                 }
             }
         }
+
     }
+
 }
