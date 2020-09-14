@@ -32,6 +32,7 @@ import io.lettuce.core.output.KeyStreamingChannel;
  * Advanced reactive and thread-safe Redis Cluster API.
  *
  * @author Mark Paluch
+ * @author Jon Chambers
  * @since 5.0
  */
 public interface RedisAdvancedClusterReactiveCommands<K, V> extends RedisClusterReactiveCommands<K, V> {
@@ -139,6 +140,15 @@ public interface RedisAdvancedClusterReactiveCommands<K, V> extends RedisCluster
      * @see RedisServerReactiveCommands#flushall()
      */
     Mono<String> flushall();
+
+    /**
+     * Remove all keys asynchronously from all databases on all cluster upstream nodes with pipelining.
+     *
+     * @return String simple-string-reply
+     * @see RedisServerReactiveCommands#flushallAsync()
+     * @since 6.0
+     */
+    Mono<String> flushallAsync();
 
     /**
      * Remove all keys from the current database on all cluster masters with pipelining.

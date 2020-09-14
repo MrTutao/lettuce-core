@@ -62,9 +62,12 @@ import io.netty.channel.*;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 
 /**
+ * Unit tests for {@link CommandHandler}.
+ *
  * @author Mark Paluch
  * @author Jongyeol Choi
  * @author Gavin Cook
+ * @author Shaphan
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -140,7 +143,7 @@ class CommandHandlerUnitTests {
         });
 
         when(latencyCollector.isEnabled()).thenReturn(true);
-        when(clientResources.commandLatencyCollector()).thenReturn(latencyCollector);
+        when(clientResources.commandLatencyRecorder()).thenReturn(latencyCollector);
         when(clientResources.tracing()).thenReturn(Tracing.disabled());
         when(endpoint.getPushListeners()).thenReturn(Collections.singleton(listener));
 
@@ -505,5 +508,30 @@ class CommandHandlerUnitTests {
         assertThat(internalBuffer.readerIndex()).isEqualTo(0);
         assertThat(internalBuffer.writerIndex()).isEqualTo(0);
         sut.channelUnregistered(context);
+    }
+
+    @Test
+    void shouldCallPolicyToDiscardReadBytes() throws Exception {
+
+        DecodeBufferPolicy policy = mock(DecodeBufferPolicy.class);
+
+        CommandHandler commandHandler = new CommandHandler(ClientOptions.builder().decodeBufferPolicy(policy).build(),
+                clientResources, endpoint);
+
+        ChannelPromise channelPromise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
+        channelPromise.setSuccess();
+
+        commandHandler.channelRegistered(context);
+        commandHandler.channelActive(context);
+
+        commandHandler.getStack().add(new Command<>(CommandType.PING, new StatusOutput<>(StringCodec.UTF8)));
+
+        ByteBuf msg = context.alloc().buffer(100);
+        msg.writeBytes("*1\r\n+OK\r\n".getBytes());
+
+        commandHandler.channelRead(context, msg);
+        commandHandler.channelUnregistered(context);
+
+        verify(policy).afterCommandDecoded(any());
     }
 }

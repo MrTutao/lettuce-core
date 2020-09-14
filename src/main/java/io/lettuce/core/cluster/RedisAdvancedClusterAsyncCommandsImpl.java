@@ -58,6 +58,7 @@ import io.lettuce.core.protocol.CommandType;
  * @param <K> Key type.
  * @param <V> Value type.
  * @author Mark Paluch
+ * @author Jon Chambers
  * @since 3.3
  */
 @SuppressWarnings("unchecked")
@@ -206,6 +207,11 @@ public class RedisAdvancedClusterAsyncCommandsImpl<K, V> extends AbstractRedisAs
     @Override
     public RedisFuture<String> flushall() {
         return MultiNodeExecution.firstOfAsync(executeOnUpstream(RedisServerAsyncCommands::flushall));
+    }
+
+    @Override
+    public RedisFuture<String> flushallAsync() {
+        return MultiNodeExecution.firstOfAsync(executeOnUpstream(RedisServerAsyncCommands::flushallAsync));
     }
 
     @Override

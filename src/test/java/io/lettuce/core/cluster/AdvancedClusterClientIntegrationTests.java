@@ -42,18 +42,15 @@ import io.lettuce.core.cluster.api.sync.RedisClusterCommands;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.core.codec.Base16;
-import io.lettuce.core.internal.LettuceStrings;
-import io.lettuce.test.TestFutures;
-import io.lettuce.test.KeysAndValues;
-import io.lettuce.test.LettuceExtension;
-import io.lettuce.test.ListStreamingAdapter;
+import io.lettuce.test.*;
 import io.lettuce.test.condition.EnabledOnCommand;
 import io.lettuce.test.settings.TestSettings;
 
 /**
  * Integration tests for {@link StatefulRedisClusterConnection}.
- * 
+ *
  * @author Mark Paluch
+ * @author Jon Chambers
  */
 @SuppressWarnings("rawtypes")
 @ExtendWith(LettuceExtension.class)
@@ -337,6 +334,20 @@ class AdvancedClusterClientIntegrationTests extends TestSupport {
 
         Long dbsize = sync.dbsize();
         assertThat(dbsize).isEqualTo(0);
+    }
+
+    @Test
+    void flushallAsync() {
+
+        writeKeysToTwoNodes();
+
+        assertThat(sync.flushallAsync()).isEqualTo("OK");
+
+        Wait.untilTrue(() -> sync.get(KEY_ON_NODE_1) == null).waitOrTimeout();
+        Wait.untilTrue(() -> sync.get(KEY_ON_NODE_2) == null).waitOrTimeout();
+
+        assertThat(sync.get(KEY_ON_NODE_1)).isNull();
+        assertThat(sync.get(KEY_ON_NODE_2)).isNull();
     }
 
     @Test

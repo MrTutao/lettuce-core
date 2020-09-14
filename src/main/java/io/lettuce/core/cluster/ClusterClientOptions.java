@@ -23,6 +23,7 @@ import io.lettuce.core.SocketOptions;
 import io.lettuce.core.SslOptions;
 import io.lettuce.core.TimeoutOptions;
 import io.lettuce.core.internal.LettuceAssert;
+import io.lettuce.core.protocol.DecodeBufferPolicy;
 import io.lettuce.core.protocol.ProtocolVersion;
 
 /**
@@ -33,23 +34,23 @@ import io.lettuce.core.protocol.ProtocolVersion;
 @SuppressWarnings("serial")
 public class ClusterClientOptions extends ClientOptions {
 
+    public static final boolean DEFAULT_CLOSE_STALE_CONNECTIONS = true;
+
+    public static final int DEFAULT_MAX_REDIRECTS = 5;
+
     public static final boolean DEFAULT_REFRESH_CLUSTER_VIEW = false;
 
     public static final long DEFAULT_REFRESH_PERIOD = 60;
 
     public static final Duration DEFAULT_REFRESH_PERIOD_DURATION = Duration.ofSeconds(DEFAULT_REFRESH_PERIOD);
 
-    public static final boolean DEFAULT_CLOSE_STALE_CONNECTIONS = true;
-
     public static final boolean DEFAULT_VALIDATE_CLUSTER_MEMBERSHIP = true;
-
-    public static final int DEFAULT_MAX_REDIRECTS = 5;
-
-    private final boolean validateClusterNodeMembership;
 
     private final int maxRedirects;
 
     private final ClusterTopologyRefreshOptions topologyRefreshOptions;
+
+    private final boolean validateClusterNodeMembership;
 
     protected ClusterClientOptions(Builder builder) {
 
@@ -115,13 +116,15 @@ public class ClusterClientOptions extends ClientOptions {
         }
 
         Builder builder = new Builder();
-        builder.autoReconnect(clientOptions.isAutoReconnect()).bufferUsageRatio(clientOptions.getBufferUsageRatio())
+        builder.autoReconnect(clientOptions.isAutoReconnect())
                 .cancelCommandsOnReconnectFailure(clientOptions.isCancelCommandsOnReconnectFailure())
-                .disconnectedBehavior(clientOptions.getDisconnectedBehavior()).scriptCharset(clientOptions.getScriptCharset())
+                .decodeBufferPolicy(clientOptions.getDecodeBufferPolicy())
+                .disconnectedBehavior(clientOptions.getDisconnectedBehavior())
+                .pingBeforeActivateConnection(clientOptions.isPingBeforeActivateConnection())
                 .publishOnScheduler(clientOptions.isPublishOnScheduler())
                 .protocolVersion(clientOptions.getConfiguredProtocolVersion())
-                .requestQueueSize(clientOptions.getRequestQueueSize()).socketOptions(clientOptions.getSocketOptions())
-                .sslOptions(clientOptions.getSslOptions())
+                .requestQueueSize(clientOptions.getRequestQueueSize()).scriptCharset(clientOptions.getScriptCharset())
+                .socketOptions(clientOptions.getSocketOptions()).sslOptions(clientOptions.getSslOptions())
                 .suspendReconnectOnProtocolFailure(clientOptions.isSuspendReconnectOnProtocolFailure())
                 .timeoutOptions(clientOptions.getTimeoutOptions());
 
@@ -153,15 +156,40 @@ public class ClusterClientOptions extends ClientOptions {
         protected Builder() {
         }
 
+        @Override
+        public Builder autoReconnect(boolean autoReconnect) {
+            super.autoReconnect(autoReconnect);
+            return this;
+        }
+
         /**
-         * Validate the cluster node membership before allowing connections to a cluster node. Defaults to {@code true}. See
-         * {@link ClusterClientOptions#DEFAULT_VALIDATE_CLUSTER_MEMBERSHIP}.
-         *
-         * @param validateClusterNodeMembership {@code true} if validation is enabled.
+         * @param bufferUsageRatio the buffer usage ratio. Must be between {@code 0} and {@code 2^31-1}, typically a value
+         *        between 1 and 10 representing 50% to 90%.
          * @return {@code this}
+         * @deprecated since 6.0 in favor of {@link DecodeBufferPolicy}.
          */
-        public Builder validateClusterNodeMembership(boolean validateClusterNodeMembership) {
-            this.validateClusterNodeMembership = validateClusterNodeMembership;
+        @Override
+        @Deprecated
+        public Builder bufferUsageRatio(int bufferUsageRatio) {
+            super.bufferUsageRatio(bufferUsageRatio);
+            return this;
+        }
+
+        @Override
+        public Builder cancelCommandsOnReconnectFailure(boolean cancelCommandsOnReconnectFailure) {
+            super.cancelCommandsOnReconnectFailure(cancelCommandsOnReconnectFailure);
+            return this;
+        }
+
+        @Override
+        public Builder decodeBufferPolicy(DecodeBufferPolicy decodeBufferPolicy) {
+            super.decodeBufferPolicy(decodeBufferPolicy);
+            return this;
+        }
+
+        @Override
+        public Builder disconnectedBehavior(DisconnectedBehavior disconnectedBehavior) {
+            super.disconnectedBehavior(disconnectedBehavior);
             return this;
         }
 
@@ -174,17 +202,6 @@ public class ClusterClientOptions extends ClientOptions {
          */
         public Builder maxRedirects(int maxRedirects) {
             this.maxRedirects = maxRedirects;
-            return this;
-        }
-
-        /**
-         * Sets the {@link ClusterTopologyRefreshOptions} for detailed control of topology updates.
-         *
-         * @param topologyRefreshOptions the {@link ClusterTopologyRefreshOptions}
-         * @return {@code this}
-         */
-        public Builder topologyRefreshOptions(ClusterTopologyRefreshOptions topologyRefreshOptions) {
-            this.topologyRefreshOptions = topologyRefreshOptions;
             return this;
         }
 
@@ -201,20 +218,8 @@ public class ClusterClientOptions extends ClientOptions {
         }
 
         @Override
-        public Builder autoReconnect(boolean autoReconnect) {
-            super.autoReconnect(autoReconnect);
-            return this;
-        }
-
-        @Override
         public Builder suspendReconnectOnProtocolFailure(boolean suspendReconnectOnProtocolFailure) {
             super.suspendReconnectOnProtocolFailure(suspendReconnectOnProtocolFailure);
-            return this;
-        }
-
-        @Override
-        public Builder cancelCommandsOnReconnectFailure(boolean cancelCommandsOnReconnectFailure) {
-            super.cancelCommandsOnReconnectFailure(cancelCommandsOnReconnectFailure);
             return this;
         }
 
@@ -227,12 +232,6 @@ public class ClusterClientOptions extends ClientOptions {
         @Override
         public Builder requestQueueSize(int requestQueueSize) {
             super.requestQueueSize(requestQueueSize);
-            return this;
-        }
-
-        @Override
-        public Builder disconnectedBehavior(DisconnectedBehavior disconnectedBehavior) {
-            super.disconnectedBehavior(disconnectedBehavior);
             return this;
         }
 
@@ -260,9 +259,26 @@ public class ClusterClientOptions extends ClientOptions {
             return this;
         }
 
-        @Override
-        public Builder bufferUsageRatio(int bufferUsageRatio) {
-            super.bufferUsageRatio(bufferUsageRatio);
+        /**
+         * Sets the {@link ClusterTopologyRefreshOptions} for detailed control of topology updates.
+         *
+         * @param topologyRefreshOptions the {@link ClusterTopologyRefreshOptions}
+         * @return {@code this}
+         */
+        public Builder topologyRefreshOptions(ClusterTopologyRefreshOptions topologyRefreshOptions) {
+            this.topologyRefreshOptions = topologyRefreshOptions;
+            return this;
+        }
+
+        /**
+         * Validate the cluster node membership before allowing connections to a cluster node. Defaults to {@code true}. See
+         * {@link ClusterClientOptions#DEFAULT_VALIDATE_CLUSTER_MEMBERSHIP}.
+         *
+         * @param validateClusterNodeMembership {@code true} if validation is enabled.
+         * @return {@code this}
+         */
+        public Builder validateClusterNodeMembership(boolean validateClusterNodeMembership) {
+            this.validateClusterNodeMembership = validateClusterNodeMembership;
             return this;
         }
 
@@ -290,17 +306,39 @@ public class ClusterClientOptions extends ClientOptions {
 
         Builder builder = new Builder();
 
-        builder.autoReconnect(isAutoReconnect()).bufferUsageRatio(getBufferUsageRatio())
+        builder.autoReconnect(isAutoReconnect())
                 .cancelCommandsOnReconnectFailure(isCancelCommandsOnReconnectFailure())
-                .disconnectedBehavior(getDisconnectedBehavior()).scriptCharset(getScriptCharset())
+                .decodeBufferPolicy(getDecodeBufferPolicy())
+                .disconnectedBehavior(getDisconnectedBehavior()).maxRedirects(getMaxRedirects())
                 .publishOnScheduler(isPublishOnScheduler()).pingBeforeActivateConnection(isPingBeforeActivateConnection())
                 .protocolVersion(getConfiguredProtocolVersion()).requestQueueSize(getRequestQueueSize())
-                .socketOptions(getSocketOptions()).sslOptions(getSslOptions())
+                .scriptCharset(getScriptCharset()).socketOptions(getSocketOptions()).sslOptions(getSslOptions())
                 .suspendReconnectOnProtocolFailure(isSuspendReconnectOnProtocolFailure()).timeoutOptions(getTimeoutOptions())
-                .validateClusterNodeMembership(isValidateClusterNodeMembership()).maxRedirects(getMaxRedirects())
-                .topologyRefreshOptions(getTopologyRefreshOptions());
+                .topologyRefreshOptions(getTopologyRefreshOptions())
+                .validateClusterNodeMembership(isValidateClusterNodeMembership());
 
         return builder;
+    }
+
+    /**
+     * Flag, whether to close stale connections when refreshing the cluster topology. Defaults to {@code true}. Comes only into
+     * effect if {@link #isRefreshClusterView()} is {@code true}. Returns the value from {@link ClusterTopologyRefreshOptions}
+     * if provided.
+     *
+     * @return {@code true} if stale connections are cleaned up after cluster topology updates
+     */
+    public boolean isCloseStaleConnections() {
+        return topologyRefreshOptions.isCloseStaleConnections();
+    }
+
+    /**
+     * Number of maximal of cluster redirects ({@literal -MOVED} and {@literal -ASK}) to follow in case a key was moved from one
+     * node to another node. Defaults to {@literal 5}. See {@link ClusterClientOptions#DEFAULT_MAX_REDIRECTS}.
+     *
+     * @return the maximal number of followed cluster redirects
+     */
+    public int getMaxRedirects() {
+        return maxRedirects;
     }
 
     /**
@@ -324,15 +362,14 @@ public class ClusterClientOptions extends ClientOptions {
         return topologyRefreshOptions.getRefreshPeriod();
     }
 
+
     /**
-     * Flag, whether to close stale connections when refreshing the cluster topology. Defaults to {@code true}. Comes only
-     * into effect if {@link #isRefreshClusterView()} is {@code true}. Returns the value from
-     * {@link ClusterTopologyRefreshOptions} if provided.
+     * The {@link ClusterTopologyRefreshOptions} for detailed control of topology updates.
      *
-     * @return {@code true} if stale connections are cleaned up after cluster topology updates
+     * @return the {@link ClusterTopologyRefreshOptions}.
      */
-    public boolean isCloseStaleConnections() {
-        return topologyRefreshOptions.isCloseStaleConnections();
+    public ClusterTopologyRefreshOptions getTopologyRefreshOptions() {
+        return topologyRefreshOptions;
     }
 
     /**
@@ -342,25 +379,6 @@ public class ClusterClientOptions extends ClientOptions {
      */
     public boolean isValidateClusterNodeMembership() {
         return validateClusterNodeMembership;
-    }
-
-    /**
-     * Number of maximal of cluster redirects ({@literal -MOVED} and {@literal -ASK}) to follow in case a key was moved from one
-     * node to another node. Defaults to {@literal 5}. See {@link ClusterClientOptions#DEFAULT_MAX_REDIRECTS}.
-     *
-     * @return the maximal number of followed cluster redirects
-     */
-    public int getMaxRedirects() {
-        return maxRedirects;
-    }
-
-    /**
-     * The {@link ClusterTopologyRefreshOptions} for detailed control of topology updates.
-     *
-     * @return the {@link ClusterTopologyRefreshOptions}.
-     */
-    public ClusterTopologyRefreshOptions getTopologyRefreshOptions() {
-        return topologyRefreshOptions;
     }
 
 }

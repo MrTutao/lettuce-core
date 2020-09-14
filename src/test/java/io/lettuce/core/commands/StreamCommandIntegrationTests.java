@@ -34,7 +34,6 @@ import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.models.stream.PendingMessage;
 import io.lettuce.core.models.stream.PendingMessages;
-import io.lettuce.core.models.stream.PendingParser;
 import io.lettuce.core.output.NestedMultiOutput;
 import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.test.LettuceExtension;
@@ -322,6 +321,16 @@ public class StreamCommandIntegrationTests extends TestSupport {
     }
 
     @Test
+    void xpendingWithoutRead() {
+
+        redis.xgroupCreate(StreamOffset.latest(key), "group", XGroupCreateArgs.Builder.mkstream());
+
+        PendingMessages pendingEntries = redis.xpending(key, "group");
+        assertThat(pendingEntries.getCount()).isEqualTo(0);
+        assertThat(pendingEntries.getConsumerMessageCount()).isEmpty();
+    }
+
+    @Test
     void xpendingWithGroup() {
 
         redis.xgroupCreate(StreamOffset.latest(key), "group", XGroupCreateArgs.Builder.mkstream());
@@ -348,6 +357,15 @@ public class StreamCommandIntegrationTests extends TestSupport {
         assertThat(message.getId()).isEqualTo(id);
         assertThat(message.getConsumer()).isEqualTo("consumer1");
         assertThat(message.getRedeliveryCount()).isEqualTo(1);
+    }
+
+    @Test
+    void xpendingWithoutMessages() {
+
+        redis.xgroupCreate(StreamOffset.latest(key), "group", XGroupCreateArgs.Builder.mkstream());
+
+        List<PendingMessage> pendingEntries = redis.xpending(key, "group", Range.unbounded(), Limit.from(10));
+        assertThat(pendingEntries).isEmpty();
     }
 
     @Test
@@ -478,8 +496,8 @@ public class StreamCommandIntegrationTests extends TestSupport {
         redis.xadd(key, Collections.singletonMap("key", "value"));
         redis.xreadgroup(Consumer.from("group", "consumer1"), StreamOffset.lastConsumed(key));
 
-        assertThat(redis.xgroupDelconsumer(key, Consumer.from("group", "consumer1"))).isTrue();
-        assertThat(redis.xgroupDelconsumer(key, Consumer.from("group", "consumer1"))).isFalse();
+        assertThat(redis.xgroupDelconsumer(key, Consumer.from("group", "consumer1"))).isOne();
+        assertThat(redis.xgroupDelconsumer(key, Consumer.from("group", "consumer1"))).isZero();
     }
 
     @Test

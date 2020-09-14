@@ -55,6 +55,7 @@ import io.lettuce.core.output.KeyValueStreamingChannel;
  * @param <K> Key type.
  * @param <V> Value type.
  * @author Mark Paluch
+ * @author Jon Chambers
  * @since 4.0
  */
 public class RedisAdvancedClusterReactiveCommandsImpl<K, V> extends AbstractRedisReactiveCommands<K, V>
@@ -195,6 +196,13 @@ public class RedisAdvancedClusterReactiveCommandsImpl<K, V> extends AbstractRedi
     public Mono<String> flushall() {
 
         Map<String, Publisher<String>> publishers = executeOnUpstream(RedisServerReactiveCommands::flushall);
+        return Flux.merge(publishers.values()).last();
+    }
+
+    @Override
+    public Mono<String> flushallAsync() {
+
+        Map<String, Publisher<String>> publishers = executeOnUpstream(RedisServerReactiveCommands::flushallAsync);
         return Flux.merge(publishers.values()).last();
     }
 
